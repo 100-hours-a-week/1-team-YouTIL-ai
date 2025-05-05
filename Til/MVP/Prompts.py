@@ -1,6 +1,8 @@
+from state_types import *
+
 class LanggraphPrompts:    
     @classmethod
-    def make_code_summary_prompt(cls, file: dict[str, str]) -> str:
+    def make_code_summary_prompt(cls, file: FileModel) -> str:
         """코드 요약 프롬프트를 생성합니다.
         
         Args:
@@ -11,8 +13,8 @@ class LanggraphPrompts:
         Returns:
             str: 생성된 프롬프트
         """
-        filepath = file["filepath"]
-        latest_code = file["latest_code"]
+        filepath = file.filepath
+        latest_code = file.latest_code
 
         prompt = f"""
     다음은 소프트웨어 프로젝트의 하나의 소스코드 파일입니다.

@@ -2,49 +2,58 @@ from Prompts import *
 from state_types import *
 from Langgraph_nodes import *
 from fastapi import FastAPI, HTTPException
-from model import get_til_model
+from prometheus_fastapi_instrumentator import Instrumentator
+from model import *
+from dotenv import load_dotenv
 import uvicorn
 import nest_asyncio
 
-app = FastAPI()
+# 디버깅 패키지
+import traceback
 
+load_dotenv()
+app = FastAPI(debug=True)
+# 프로메테우스 연동
+Instrumentator().instrument(app).expose(app)
+
+
+# graph = Langgraph(model=model) 
 
 @app.post("/til")
-async def process_til(data: StateType):
+async def process_til(data: StateModel):
     try:
-        # TIL 모델 가져오기
-        til_model = get_til_model()
-        
+        model = get_til_model()
         # Langgraph 초기화
-        graph = Langgraph()
+        graph = Langgraph(model = model)
         
-        # 상태 초기화
-        state = {
-            "username": data.username,
-            "date": data.date,
-            "repo": data.repo,
-            "files": [
-                {
-                    "filepath": file.filepath,
-                    "latest_code": file.latest_code,
-                    "patches": [
-                        {
-                            "commit_message": patch["commit_message"],
-                            "patch": patch["patch"]
-                        }
-                        for patch in file.patches
-                    ]
-                }
-                for file in data.files
-            ]
-        }
+        # # 상태 초기화
+        # state = {
+        #     "username": data.username,
+        #     "date": data.date,
+        #     "repo": data.repo,
+        #     "files": [
+        #         {
+        #             "filepath": file.filepath,
+        #             "latest_code": file.latest_code,
+        #             "patches":  [
+        #             {
+        #                 "commit_message": patch.commit_message,
+        #                 "patch": patch.patch
+        #             }
+        #             for patch in file.patches
+        #         ]
+        #         }
+        #         for file in data.files
+        #     ]
+        # }
         
         # Langgraph 실행
-        result = await graph.graph.arun(state)
+        result = await graph.graph.ainvoke(data)
         
-        return result
+        return result["til_json"]
         
     except Exception as e:
+        traceback.print_exc()  # <<<<< 핵심
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
