@@ -17,7 +17,7 @@ class ModelConfig:
     GPU_MEMORY_UTILIZATION: float = 0.95
     MAX_NUM_SEQS: int = 100
     MAX_MODEL_LEN: int = 4096
-    MAX_NUM_BATCHED_TOKENS: int = 8192
+    MAX_NUM_BATCHED_TOKENS: int = 4096
     
     # 생성 파라미터
     TEMPERATURE: float = 0.6
@@ -112,6 +112,7 @@ class TILModels:
         """임베딩 벡터의 차원을 반환합니다."""
         return self.embedding_model.config.hidden_size
 
+# 모델은 요청이 있을 때, 처음으로 로딩함 -> 그 이후에는 요청 즉시 생성
 @lru_cache()
 def get_til_model() -> TILModels:
     """싱글톤 패턴으로 TILModel 인스턴스 제공"""

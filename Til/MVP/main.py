@@ -16,36 +16,14 @@ app = FastAPI(debug=True)
 # 프로메테우스 연동
 Instrumentator().instrument(app).expose(app)
 
-
-# graph = Langgraph(model=model) 
+model = get_til_model()
 
 @app.post("/til")
 async def process_til(data: StateModel):
     try:
-        model = get_til_model()
+        files_num = len(data.files)
         # Langgraph 초기화
-        graph = Langgraph(model = model)
-        
-        # # 상태 초기화
-        # state = {
-        #     "username": data.username,
-        #     "date": data.date,
-        #     "repo": data.repo,
-        #     "files": [
-        #         {
-        #             "filepath": file.filepath,
-        #             "latest_code": file.latest_code,
-        #             "patches":  [
-        #             {
-        #                 "commit_message": patch.commit_message,
-        #                 "patch": patch.patch
-        #             }
-        #             for patch in file.patches
-        #         ]
-        #         }
-        #         for file in data.files
-        #     ]
-        # }
+        graph = Langgraph(files_num = files_num, model = model)
         
         # Langgraph 실행
         result = await graph.graph.ainvoke(data)
@@ -53,7 +31,7 @@ async def process_til(data: StateModel):
         return result["til_json"]
         
     except Exception as e:
-        traceback.print_exc()  # <<<<< 핵심
+        traceback.print_exc() 
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

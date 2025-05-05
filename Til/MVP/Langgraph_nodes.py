@@ -12,25 +12,30 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Langgraph:
-    def __init__(self, model: TILModels):
+    def __init__(self, files_num, model: TILModels):
         self.prompts = LanggraphPrompts()
         self.model = model
         self.client = QdrantClient(host="10.128.0.8", port=6333)
+        self.files_num = files_num
         self.graph = self._build_graph()
+        
 
     def _build_graph(self) -> StateGraph:
         builder = StateGraph(StateModel)
         builder.set_entry_point("fork")
         builder.add_node("fork", self.fork_code_nodes)
+        # 동적 node 수 결정 (최대 5개)
+        max_nodes = min(self.files_num, 5)
 
-        for i in range(5):
+
+        for i in range(max_nodes):
             builder.add_node(f"code_summary_node{i+1}", self.make_code_summary_node(i+1))
             builder.add_node(f"patch_summary_node{i+1}", self.make_patch_summary_node(i+1))
             builder.add_edge("fork", f"code_summary_node{i+1}")
             builder.add_edge(f"code_summary_node{i+1}", f"patch_summary_node{i+1}")
 
         builder.add_node("til_draft_node", self.til_draft_node)
-        for i in range(5):
+        for i in range(max_nodes):
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
 
         builder.add_node("json_parse_node", self.parse_til_to_json)
@@ -96,12 +101,12 @@ class Langgraph:
         patch_summaries = state.patch_summary
         summaries = list(patch_summaries.values())
         combined_summary = "\n\n".join(summaries)
-        prompt = self.prompts.til_draft_prompt(state.username, state.date, state.repo, combined_summary)
+        prompt = self.prompts.til_draft_prompt(username, date, repo, combined_summary)
         draft_json_str = await self.model.generate_til(prompt)
         return {"til_draft": draft_json_str}
 
     @traceable
-    def parse_til_to_json(self, state: StateModel) -> dict:
+    async def parse_til_to_json(self, state: StateModel) -> dict:
         til_draft = state.til_draft
         try:
             start =til_draft.find("```json")
