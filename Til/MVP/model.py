@@ -1,15 +1,19 @@
 import uuid
 from functools import lru_cache
 import logging
+import os
 from typing import Optional, List
+from dotenv import load_dotenv
 
 from transformers import AutoTokenizer, AutoModel
 from vllm import AsyncEngineArgs, AsyncLLMEngine, SamplingParams
 
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 class ModelConfig:
-    GEMMA_PATH: str = "/home/mmm060400/KTB/models/google/gemma-3-4b-it/"
+    GEMMA_PATH: str = os.getenv("GEMMA_MODEL_PATH")
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     
     # VLLM 설정
