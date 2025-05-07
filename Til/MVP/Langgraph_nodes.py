@@ -15,7 +15,7 @@ class Langgraph:
     def __init__(self, files_num, model: TILModels):
         self.prompts = LanggraphPrompts()
         self.model = model
-        self.client = QdrantClient(host="10.128.0.8", port=6333)
+        self.client = QdrantClient(host="34.44.240.237", port=6333)
         self.files_num = files_num
         self.graph = self._build_graph()
         
