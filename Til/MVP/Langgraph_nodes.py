@@ -61,10 +61,18 @@ class Langgraph:
     def make_code_summary_node(self, node_id: int):
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
+
+            params = SamplingParams(
+            temperature=0.7,
+            top_p=0.9,
+            max_tokens=1024,
+            stop=["<eos>"]
+            )
+
             file = next(file for file in state.files if file.node_id == node_id)
 
             prompt = self.prompts.make_code_summary_prompt(file)
-            summary = await self.model.generate_til(prompt)
+            summary = await self.model.generate_til(prompt, params)
 
             return {"code_summary": {f"code_summary_{node_id}": summary}}
         return code_summary_node
@@ -72,6 +80,13 @@ class Langgraph:
     def make_patch_summary_node(self, node_id: int):
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
+            params = SamplingParams(
+            temperature=0.7,
+            top_p=0.9,
+            max_tokens=512,
+            stop=["<eos>"]
+            )
+
             files = state.files
             file_entry = next(file for file in files if file.node_id == node_id)
 
@@ -87,13 +102,19 @@ class Langgraph:
                 for j, p in enumerate(patches)
             )
             prompt = self.prompts.make_patch_summary_prompt(code_summary, patch_section)
-            summary = await self.model.generate_til(prompt)
+            summary = await self.model.generate_til(prompt, params)
 
             return {"patch_summary": {f"patch_summary_{node_id}": summary}}
         return patch_summary_node
 
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
+        params = SamplingParams(
+        temperature=0.7,
+        top_p=0.9,
+        max_tokens=4096,
+        stop=["<eos>"]
+        )
         username = state.username
         date = state.date
         repo = state.repo
@@ -102,7 +123,7 @@ class Langgraph:
         summaries = list(patch_summaries.values())
         combined_summary = "\n\n".join(summaries)
         prompt = self.prompts.til_draft_prompt(username, date, repo, combined_summary)
-        draft_json_str = await self.model.generate_til(prompt)
+        draft_json_str = await self.model.generate_til(prompt, params)
         return {"til_draft": draft_json_str}
 
     @traceable

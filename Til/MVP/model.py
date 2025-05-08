@@ -24,11 +24,11 @@ class ModelConfig:
     MAX_NUM_BATCHED_TOKENS: int = 4096
     
     # 생성 파라미터
-    TEMPERATURE: float = 0.6
-    TOP_P: float = 0.7
-    REPETITION_PENALTY: float = 1.1
-    MAX_TOKENS: int = 4096
-    STOP_TOKENS: list = ["<eos>"]
+    # TEMPERATURE: float = 0.6
+    # TOP_P: float = 0.7
+    # REPETITION_PENALTY: float = 1.1
+    # MAX_TOKENS: int = 4096
+    # STOP_TOKENS: list = ["<eos>"]
 
 class TILModels:
     def __init__(self, config: ModelConfig = ModelConfig()):
@@ -55,13 +55,13 @@ class TILModels:
             self.llm = AsyncLLMEngine.from_engine_args(engine_args)
             
             # 샘플링 파라미터 설정
-            self.sampling_params = SamplingParams(
-                temperature=self.config.TEMPERATURE,
-                top_p=self.config.TOP_P,
-                repetition_penalty=self.config.REPETITION_PENALTY,
-                max_tokens=self.config.MAX_TOKENS,
-                stop=self.config.STOP_TOKENS
-            )
+            # self.sampling_params = SamplingParams(
+            #     temperature=self.config.TEMPERATURE,
+            #     top_p=self.config.TOP_P,
+            #     repetition_penalty=self.config.REPETITION_PENALTY,
+            #     max_tokens=self.config.MAX_TOKENS,
+            #     stop=self.config.STOP_TOKENS
+            # )
             
             logger.info("모델 초기화 완료")
             
@@ -69,7 +69,8 @@ class TILModels:
             logger.error(f"모델 초기화 실패: {e}")
             raise
     
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, sampling_params: Optional[SamplingParams] = None
+) -> str:
         """LLM을 사용하여 텍스트 생성"""
         try:
             request_id = str(uuid.uuid4())
@@ -77,7 +78,7 @@ class TILModels:
             
             async for output in self.llm.generate(
                 prompt=prompt,
-                sampling_params=self.sampling_params,
+                sampling_params=sampling_params,
                 request_id=request_id
             ):
                 last_output = output.outputs[0].text
@@ -91,10 +92,11 @@ class TILModels:
             logger.error(f"텍스트 생성 실패: {e}")
             raise
     
-    async def generate_til(self, prompt: str) -> str:
+    async def generate_til(self, prompt: str, sampling_params: Optional[SamplingParams] = None
+) -> str:
         """TIL 생성을 위한 래퍼 메소드"""
         try:
-            result = await self.generate(prompt)
+            result = await self.generate(prompt, sampling_params)
             return result
         except Exception as e:
             logger.error(f"TIL 생성 실패: {e}")
