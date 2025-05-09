@@ -20,8 +20,8 @@ class ModelConfig:
     TENSOR_PARALLEL_SIZE: int = 1
     GPU_MEMORY_UTILIZATION: float = 0.95
     MAX_NUM_SEQS: int = 100
-    MAX_MODEL_LEN: int = 4096
-    MAX_NUM_BATCHED_TOKENS: int = 4096
+    MAX_MODEL_LEN: int = 2048
+    MAX_NUM_BATCHED_TOKENS: int = 2048
     
     # 생성 파라미터
     # TEMPERATURE: float = 0.6

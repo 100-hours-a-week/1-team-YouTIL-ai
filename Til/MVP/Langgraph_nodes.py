@@ -39,6 +39,7 @@ class Langgraph:
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
 
         builder.add_node("json_parse_node", self.parse_til_to_json)
+        builder.add_node("til_feedabck_node", self.til)
         builder.add_edge("til_draft_node", "json_parse_node")
 
         builder.add_node("embedding_til_node", self.embed_and_store_in_qdrant_node)
@@ -63,9 +64,10 @@ class Langgraph:
         async def code_summary_node(state: StateModel) -> dict:
 
             params = SamplingParams(
-            temperature=0.7,
+            temperature=0.2,
             top_p=0.9,
             max_tokens=1024,
+            top_k = 10,
             stop=["<eos>"]
             )
 
@@ -81,8 +83,9 @@ class Langgraph:
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.7,
+            temperature=0.2,
             top_p=0.9,
+            top_k=10,
             max_tokens=512,
             stop=["<eos>"]
             )
@@ -110,8 +113,9 @@ class Langgraph:
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.7,
+        temperature=0.2,
         top_p=0.9,
+        top_k=10,
         max_tokens=4096,
         stop=["<eos>"]
         )
