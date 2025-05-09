@@ -39,7 +39,7 @@ class Langgraph:
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
 
         builder.add_node("json_parse_node", self.parse_til_to_json)
-        builder.add_node("til_feedabck_node", self.til)
+        # builder.add_node("til_feedabck_node", self.til)
         builder.add_edge("til_draft_node", "json_parse_node")
 
         builder.add_node("embedding_til_node", self.embed_and_store_in_qdrant_node)
@@ -116,7 +116,7 @@ class Langgraph:
         temperature=0.2,
         top_p=0.9,
         top_k=10,
-        max_tokens=4096,
+        max_tokens=2048,
         stop=["<eos>"]
         )
         username = state.username
