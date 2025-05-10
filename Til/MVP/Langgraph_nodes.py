@@ -8,8 +8,19 @@ from qdrant_client.models import PointStruct
 from langsmith import traceable
 from langgraph.graph import StateGraph
 import logging
+import ast
 
 logger = logging.getLogger(__name__)
+
+def extract_before_after(diff_lines):
+    before_lines = []
+    after_lines = []
+    for line in diff_lines:
+        if line.startswith('-') and not line.startswith('---'):
+            before_lines.append(line[1:].strip())
+        elif line.startswith('+') and not line.startswith('+++'):
+            after_lines.append(line[1:].strip())
+    return before_lines, after_lines
 
 class Langgraph:
     def __init__(self, files_num, model: TILModels):
@@ -38,12 +49,13 @@ class Langgraph:
         for i in range(max_nodes):
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
 
-        builder.add_node("json_parse_node", self.parse_til_to_json)
-        # builder.add_node("til_feedabck_node", self.til)
-        builder.add_edge("til_draft_node", "json_parse_node")
+        builder.add_node("genrate_title_node", self.genrate_title_node)
+        builder.add_node("til_keywords_node", self.til_keywords_node)
+        builder.add_edge("til_draft_node", "genrate_title_node")
+        builder.add_edge("genrate_title_node", "til_keywords_node")
 
         builder.add_node("embedding_til_node", self.embed_and_store_in_qdrant_node)
-        builder.add_edge("json_parse_node", "embedding_til_node")
+        builder.add_edge("til_keywords_node", "embedding_til_node")
 
         builder.set_finish_point("embedding_til_node")
         return builder.compile()
@@ -62,13 +74,12 @@ class Langgraph:
     def make_code_summary_node(self, node_id: int):
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
-
             params = SamplingParams(
-            temperature=0.2,
-            top_p=0.9,
-            max_tokens=1024,
-            top_k = 10,
-            stop=["<eos>"]
+            temperature=0.3,
+            top_p=0.7,
+            max_tokens=512,
+            repetition_penalty = 1.3,
+            stop=["<eos>", "<pad>"]
             )
 
             file = next(file for file in state.files if file.node_id == node_id)
@@ -83,52 +94,143 @@ class Langgraph:
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.2,
+            temperature=0.3,
             top_p=0.9,
-            top_k=10,
-            max_tokens=512,
-            stop=["<eos>"]
+
+            max_tokens=256,
+            repetition_penalty = 1.3,
+            stop=["<eos>", "<pad>"]
             )
 
             files = state.files
             file_entry = next(file for file in files if file.node_id == node_id)
+            
+            patches = file_entry.patches
+            preprocessed = []
 
+            for p in patches:
+                commit = p.commit_message
+                patch = p.patch
+
+                preprocessed.append({
+                    "commit_message": commit,
+                    "raw_patch": patch,
+                    "diff_lines": patch.splitlines()
+                })
+
+            final = []
+            for p in preprocessed:
+                before, after = extract_before_after(p["diff_lines"])
+                final.append({
+                    "commit_message": p["commit_message"],
+                    "before_code": "\n".join(before),
+                    "after_code": "\n".join(after)
+                })
+
+             # 최신 변경 내역 사용
+            latest_patch = final[0] 
 
             code_summaries = state.code_summary
             code_summary = code_summaries.get(f"code_summary_{node_id}", "")
-            patches = file_entry.patches
-            if not patches:
-                return {"patch_summary": {f"patch_summary_{node_id}": f"{code_summary}\n\n(변경 이력 없음)"}}
 
-            patch_section = "\n\n".join(
-                f"{j+1}. Commit Message: {p.commit_message}\nPatch:\n{p.patch}"
-                for j, p in enumerate(patches)
-            )
-            prompt = self.prompts.make_patch_summary_prompt(code_summary, patch_section)
+            prompt = self.prompts.make_patch_summary_prompt(code_summary, latest_patch["commit_message"], latest_patch["before_code"], latest_patch["after_code"])
             summary = await self.model.generate_til(prompt, params)
 
-            return {"patch_summary": {f"patch_summary_{node_id}": summary}}
+            return {"patch_summary": 
+                    [PatchSummaryModel(
+                        filepath=file_entry.filepath,
+                        change_purpose=patches[0].commit_message,  # 최신 커밋
+                        code_changes=summary)]}
+
+            # if not patches:
+            #     return {"patch_summary": {f"patch_summary_{node_id}": f"{code_summary}\n\n(변경 이력 없음)"}}
+
+            # patch_section = "\n\n".join(
+            #     f"{j+1}. Commit Message: {p.commit_message}\nPatch:\n{p.patch}"
+            #     for j, p in enumerate(patches)
+            # )
+            # prompt = self.prompts.make_patch_summary_prompt(code_summary, patch_section)
+            # summary = await self.model.generate_til(prompt, params)
+
+            # return {"patch_summary": {f"patch_summary_{node_id}": summary}}
         return patch_summary_node
 
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.2,
+        temperature=0.6,
         top_p=0.9,
-        top_k=10,
-        max_tokens=2048,
-        stop=["<eos>"]
+        # top_k=20,
+        max_tokens=3000,
+        repetition_penalty = 1.3,
+        stop=["<eos>", "<pad>"]
         )
         username = state.username
         date = state.date
         repo = state.repo
 
+
+
         patch_summaries = state.patch_summary
-        summaries = list(patch_summaries.values())
-        combined_summary = "\n\n".join(summaries)
-        prompt = self.prompts.til_draft_prompt(username, date, repo, combined_summary)
+        prompt = self.prompts.til_draft_prompt(username, date, repo, patch_summaries)
         draft_json_str = await self.model.generate_til(prompt, params)
-        return {"til_draft": draft_json_str}
+
+        parsed = TilJsonModel(
+        username=username,
+        date=date,
+        repo=repo,
+        title="",
+        keywords="",
+        content=draft_json_str,
+        vector=[])
+
+        return {"til_json": parsed}
+
+    @traceable
+    async def genrate_title_node(self, state: StateModel) -> dict:
+        params = SamplingParams(
+        temperature=0.6,
+        top_p=0.9,
+        # top_k=20,
+        max_tokens=32,
+        # repetition_penalty = 1.2,
+        stop=["<eos>"]
+        )
+        til_json = state.til_json
+        try:
+            prompt = self.prompts.til_title_prompt(til_json.content)
+            til_title = await self.model.generate_til(prompt, params)
+            til_json.title = til_title
+            return {"til_json": state.til_json}
+        except Exception as e:
+            logger.error(f"Title 생성 실패: {e}")
+            return {"til_json": {"error": f"Title 생성 실패: {str(e)}"}}
+        
+    @traceable
+    async def til_keywords_node(self, state: StateModel) -> dict:
+        params = SamplingParams(
+            temperature=0.6,
+            top_p=0.9,
+            max_tokens=64,
+            stop=["<eos>", "<pad>"]
+        )
+
+        content = state.til_json.content
+        prompt = LanggraphPrompts.til_keywords_prompt(content)
+
+        keywords_output = await self.model.generate_til(prompt, params)
+
+        # ✅ 파싱 시도
+        try:
+            parsed = ast.literal_eval(keywords_output)
+            if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
+                state.til_json.keywords = parsed  # 성공 시: 리스트 저장
+            else:
+                raise ValueError("리스트가 아니거나 문자열이 아님")
+        except Exception:
+            state.til_json.keywords = keywords_output.strip()  # 실패 시: 문자열 그대로 저장
+
+        return {"til_json": state.til_json}
 
     @traceable
     async def parse_til_to_json(self, state: StateModel) -> dict:
@@ -165,7 +267,7 @@ class Langgraph:
 
             self.client.upsert(collection_name="til_logs", points=[point])
             til_json.vector = embedding
-            return state.til_json
+            return {"til_json": state.til_json}
 
         except Exception as e:
             logger.error(f"임베딩 생성 또는 저장 실패: {e}")

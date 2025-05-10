@@ -20,15 +20,8 @@ class ModelConfig:
     TENSOR_PARALLEL_SIZE: int = 1
     GPU_MEMORY_UTILIZATION: float = 0.95
     MAX_NUM_SEQS: int = 100
-    MAX_MODEL_LEN: int = 2048
-    MAX_NUM_BATCHED_TOKENS: int = 2048
-    
-    # 생성 파라미터
-    # TEMPERATURE: float = 0.6
-    # TOP_P: float = 0.7
-    # REPETITION_PENALTY: float = 1.1
-    # MAX_TOKENS: int = 4096
-    # STOP_TOKENS: list = ["<eos>"]
+    MAX_MODEL_LEN: int = 4096
+    MAX_NUM_BATCHED_TOKENS: int = 4096
 
 class TILModels:
     def __init__(self, config: ModelConfig = ModelConfig()):
@@ -53,15 +46,6 @@ class TILModels:
                 max_num_batched_tokens=self.config.MAX_NUM_BATCHED_TOKENS
             )
             self.llm = AsyncLLMEngine.from_engine_args(engine_args)
-            
-            # 샘플링 파라미터 설정
-            # self.sampling_params = SamplingParams(
-            #     temperature=self.config.TEMPERATURE,
-            #     top_p=self.config.TOP_P,
-            #     repetition_penalty=self.config.REPETITION_PENALTY,
-            #     max_tokens=self.config.MAX_TOKENS,
-            #     stop=self.config.STOP_TOKENS
-            # )
             
             logger.info("모델 초기화 완료")
             
