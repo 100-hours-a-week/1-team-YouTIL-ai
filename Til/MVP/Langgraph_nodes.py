@@ -1,5 +1,6 @@
 import json
 import uuid
+import re
 from Prompts import *
 from state_types import *
 from model import *
@@ -21,6 +22,22 @@ def extract_before_after(diff_lines):
         elif line.startswith('+') and not line.startswith('+++'):
             after_lines.append(line[1:].strip())
     return before_lines, after_lines
+
+def clean_llm_output(output: str) -> str:
+    # 코드 블록 제거 (```로 감싼 블록)
+    output = re.sub(r"```.*?```", "", output, flags=re.DOTALL)
+    # 코드 블록 시작/종료 따로도 제거 (단독 줄 또는 끝에 오는 것 포함)
+    output = re.sub(r"```", "", output)
+    # 마크다운 구분선/헤더 제거
+    output = re.sub(r"^---+", "", output, flags=re.MULTILINE)
+    output = re.sub(r"^#+ .*", "", output, flags=re.MULTILINE)
+    # "답변:", "제목:" 등 앞 단어 제거
+    output = re.sub(r"(?i)^.*?[:：]", "", output, count=1)
+    # 슬래시(/) 제거 또는 대체
+    output = output.replace("/", " ")  # 또는 .replace("/", "") if 공백도 싫다면
+    # 줄바꿈 → 공백
+    output = output.replace("\n", " ")
+    return output.strip()
 
 class Langgraph:
     def __init__(self, files_num, model: TILModels):
@@ -75,10 +92,10 @@ class Langgraph:
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.3,
+            temperature=0.5,
             top_p=0.7,
             max_tokens=512,
-            repetition_penalty = 1.3,
+            repetition_penalty = 1.2,
             stop=["<eos>", "<pad>"]
             )
 
@@ -94,11 +111,11 @@ class Langgraph:
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.3,
+            temperature=0.5,
             top_p=0.9,
 
-            max_tokens=256,
-            repetition_penalty = 1.3,
+            max_tokens=512,
+            repetition_penalty = 1.2,
             stop=["<eos>", "<pad>"]
             )
 
@@ -142,35 +159,21 @@ class Langgraph:
                         change_purpose=patches[0].commit_message,  # 최신 커밋
                         code_changes=summary)]}
 
-            # if not patches:
-            #     return {"patch_summary": {f"patch_summary_{node_id}": f"{code_summary}\n\n(변경 이력 없음)"}}
-
-            # patch_section = "\n\n".join(
-            #     f"{j+1}. Commit Message: {p.commit_message}\nPatch:\n{p.patch}"
-            #     for j, p in enumerate(patches)
-            # )
-            # prompt = self.prompts.make_patch_summary_prompt(code_summary, patch_section)
-            # summary = await self.model.generate_til(prompt, params)
-
-            # return {"patch_summary": {f"patch_summary_{node_id}": summary}}
         return patch_summary_node
 
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.6,
+        temperature=0.5,
         top_p=0.9,
         # top_k=20,
-        max_tokens=3000,
-        repetition_penalty = 1.3,
+        max_tokens=4096,
+        repetition_penalty = 1.2,
         stop=["<eos>", "<pad>"]
         )
         username = state.username
         date = state.date
         repo = state.repo
-
-
-
         patch_summaries = state.patch_summary
         prompt = self.prompts.til_draft_prompt(username, date, repo, patch_summaries)
         draft_json_str = await self.model.generate_til(prompt, params)
@@ -189,17 +192,19 @@ class Langgraph:
     @traceable
     async def genrate_title_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.6,
+        temperature=0.5,
         top_p=0.9,
         # top_k=20,
         max_tokens=32,
-        # repetition_penalty = 1.2,
+        repetition_penalty = 1.2,
         stop=["<eos>"]
         )
         til_json = state.til_json
         try:
             prompt = self.prompts.til_title_prompt(til_json.content)
             til_title = await self.model.generate_til(prompt, params)
+            # 특수문자 제거 함수 적용
+            til_title = clean_llm_output(til_title)
             til_json.title = til_title
             return {"til_json": state.til_json}
         except Exception as e:
@@ -219,8 +224,10 @@ class Langgraph:
         prompt = LanggraphPrompts.til_keywords_prompt(content)
 
         keywords_output = await self.model.generate_til(prompt, params)
+        # 전처리 함수 적용
+        keywords_output = clean_llm_output(keywords_output)
 
-        # ✅ 파싱 시도
+        # 파싱 시도
         try:
             parsed = ast.literal_eval(keywords_output)
             if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):

@@ -27,8 +27,12 @@ async def process_til(data: StateModel):
         
         # Langgraph 실행
         result = await graph.graph.ainvoke(data)
+
+        # vector만 제외하고 dict로 반환
+        til_json = result["til_json"]
+        til_json_dict = til_json.dict(exclude={"vector"})
         
-        return result["til_json"]
+        return til_json_dict
         
     except Exception as e:
         traceback.print_exc() 
