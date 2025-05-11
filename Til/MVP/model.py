@@ -45,6 +45,7 @@ class TILModels:
                 max_model_len=self.config.MAX_MODEL_LEN,
                 max_num_batched_tokens=self.config.MAX_NUM_BATCHED_TOKENS
             )
+            
             self.llm = AsyncLLMEngine.from_engine_args(engine_args)
             
             logger.info("모델 초기화 완료")
