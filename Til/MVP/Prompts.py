@@ -90,6 +90,9 @@ class LanggraphPrompts:
         prompt = f"""
         다음은 하나 이상의 소스코드 파일에 대한 분석 요약과 변경 이력 분석입니다. 이를 참고하여 마크다운 형식의 TIL을 작성해 주세요.
 
+        [날짜]
+        {date}
+
         [코드 + 변경 요약]
         {combined_summary}
 
@@ -98,6 +101,7 @@ class LanggraphPrompts:
         - TIL 내용은 한국어로 작성하세요.
 
        TIL 작성 시 반드시 포함할 항목 (개조식):
+       제목: # 날짜 TIL
         1. 오늘 배운 내용
         2. 개념 정리
         3. 해당 개념이 필요한 이유
@@ -145,7 +149,7 @@ class LanggraphPrompts:
 
         [TIL 내용]
         {content}
-        """.strip()
+        """
         return prompt
     
     @classmethod

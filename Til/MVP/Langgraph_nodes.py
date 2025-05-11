@@ -13,6 +13,7 @@ import ast
 
 logger = logging.getLogger(__name__)
 
+# 커밋 이력 데이터 
 def extract_before_after(diff_lines):
     before_lines = []
     after_lines = []
@@ -23,6 +24,7 @@ def extract_before_after(diff_lines):
             after_lines.append(line[1:].strip())
     return before_lines, after_lines
 
+# 특수 문제 전처리 함수(제목, 키워드)
 def clean_llm_output(output: str) -> str:
     # 코드 블록 제거 (```로 감싼 블록)
     output = re.sub(r"```.*?```", "", output, flags=re.DOTALL)
@@ -43,7 +45,7 @@ class Langgraph:
     def __init__(self, files_num, model: TILModels):
         self.prompts = LanggraphPrompts()
         self.model = model
-        self.client = QdrantClient(host="34.29.126.77", port=6333)
+        self.client = QdrantClient(host="104.154.17.188", port=6333)
         self.files_num = files_num
         self.graph = self._build_graph()
         
@@ -92,10 +94,10 @@ class Langgraph:
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.5,
-            top_p=0.7,
+            temperature=0.6,
+            top_p=0.95,
             max_tokens=512,
-            repetition_penalty = 1.2,
+            repetition_penalty = 1.3,
             stop=["<eos>", "<pad>"]
             )
 
@@ -111,11 +113,11 @@ class Langgraph:
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.5,
+            temperature=0.6,
             top_p=0.9,
 
             max_tokens=512,
-            repetition_penalty = 1.2,
+            repetition_penalty = 1.1,
             stop=["<eos>", "<pad>"]
             )
 
@@ -164,11 +166,11 @@ class Langgraph:
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.5,
+        temperature=0.6,
         top_p=0.9,
         # top_k=20,
         max_tokens=4096,
-        repetition_penalty = 1.2,
+        repetition_penalty = 1.1,
         stop=["<eos>", "<pad>"]
         )
         username = state.username
@@ -192,12 +194,12 @@ class Langgraph:
     @traceable
     async def genrate_title_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.5,
+        temperature=0.6,
         top_p=0.9,
         # top_k=20,
         max_tokens=32,
-        repetition_penalty = 1.2,
-        stop=["<eos>"]
+        repetition_penalty = 1.1,
+        stop=["<eos>", "<pad>"]
         )
         til_json = state.til_json
         try:
@@ -223,34 +225,25 @@ class Langgraph:
         content = state.til_json.content
         prompt = LanggraphPrompts.til_keywords_prompt(content)
 
-        keywords_output = await self.model.generate_til(prompt, params)
-        # 전처리 함수 적용
-        keywords_output = clean_llm_output(keywords_output)
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            keywords_output = await self.model.generate_til(prompt, params)
+            keywords_output = clean_llm_output(keywords_output)
 
-        # 파싱 시도
-        try:
-            parsed = ast.literal_eval(keywords_output)
-            if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
-                state.til_json.keywords = parsed  # 성공 시: 리스트 저장
-            else:
-                raise ValueError("리스트가 아니거나 문자열이 아님")
-        except Exception:
-            state.til_json.keywords = keywords_output.strip()  # 실패 시: 문자열 그대로 저장
+            try:
+                parsed = ast.literal_eval(keywords_output)
+                if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
+                    state.til_json.keywords = parsed
+                    break  # 파싱 성공
+                else:
+                    raise ValueError("응답이 리스트 형식이 아님")
+            except Exception as e:
+                logging.warning(f"[til_keywords_node] 키워드 파싱 실패 (시도 {attempt}/{max_attempts}): {e}")
+                if attempt == max_attempts:
+                    logging.error("[til_keywords_node] 키워드 파싱 3회 실패, 원본 문자열 저장")
+                    state.til_json.keywords = keywords_output.strip()
 
         return {"til_json": state.til_json}
-
-    @traceable
-    async def parse_til_to_json(self, state: StateModel) -> dict:
-        til_draft = state.til_draft
-        try:
-            start =til_draft.find("```json")
-            end = til_draft.find("```", start + 1)
-            json_str = til_draft[start + 7:end].strip()
-            parsed = json.loads(json_str)
-            return {"til_json": parsed}
-        except Exception as e:
-            logger.error(f"JSON 파싱 실패: {e}")
-            return {"til_json": {"error": f"JSON 파싱 실패: {str(e)}"}}
 
     @traceable
     async def embed_and_store_in_qdrant_node(self, state: StateModel) -> dict:
