@@ -37,6 +37,7 @@ def clean_llm_output(output: str) -> str:
     output = re.sub(r"(?i)^.*?[:：]", "", output, count=1)
     # 슬래시(/) 제거 또는 대체
     output = output.replace("/", " ")  # 또는 .replace("/", "") if 공백도 싫다면
+    output = output.replace("\\", " ")  # 또는 .replace("/", "") if 공백도 싫다면
     # 줄바꿈 → 공백
     output = output.replace("\n", " ")
     return output.strip()
@@ -94,10 +95,10 @@ class Langgraph:
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.6,
-            top_p=0.95,
+            temperature=0.3,
+            top_p=0.7,
             max_tokens=512,
-            repetition_penalty = 1.3,
+            repetition_penalty = 1.1,
             stop=["<eos>", "<pad>"]
             )
 
@@ -113,8 +114,8 @@ class Langgraph:
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
             params = SamplingParams(
-            temperature=0.6,
-            top_p=0.9,
+            temperature=0.3,
+            top_p=0.7,
 
             max_tokens=512,
             repetition_penalty = 1.1,
@@ -166,11 +167,11 @@ class Langgraph:
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.6,
-        top_p=0.9,
+        temperature=0.3,
+        top_p=0.7,
         # top_k=20,
-        max_tokens=4096,
-        repetition_penalty = 1.1,
+        max_tokens=2048,
+        repetition_penalty = 1.2,
         stop=["<eos>", "<pad>"]
         )
         username = state.username
@@ -194,11 +195,11 @@ class Langgraph:
     @traceable
     async def genrate_title_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-        temperature=0.6,
+        temperature=0.3,
         top_p=0.9,
         # top_k=20,
         max_tokens=32,
-        repetition_penalty = 1.1,
+        repetition_penalty = 1.05,
         stop=["<eos>", "<pad>"]
         )
         til_json = state.til_json
@@ -216,9 +217,10 @@ class Langgraph:
     @traceable
     async def til_keywords_node(self, state: StateModel) -> dict:
         params = SamplingParams(
-            temperature=0.6,
+            temperature=0.3,
             top_p=0.9,
             max_tokens=64,
+            repetition_penalty= 1.2,
             stop=["<eos>", "<pad>"]
         )
 

@@ -19,9 +19,9 @@ class ModelConfig:
     # VLLM 설정
     TENSOR_PARALLEL_SIZE: int = 1
     GPU_MEMORY_UTILIZATION: float = 0.95
-    MAX_NUM_SEQS: int = 100
-    MAX_MODEL_LEN: int = 4096
-    MAX_NUM_BATCHED_TOKENS: int = 4096
+    MAX_NUM_SEQS: int = 25
+    MAX_MODEL_LEN: int = 2048
+    MAX_NUM_BATCHED_TOKENS: int = 2048
 
 class TILModels:
     def __init__(self, config: ModelConfig = ModelConfig()):
