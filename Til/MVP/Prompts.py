@@ -26,12 +26,37 @@ class LanggraphPrompts:
 
         ⚠️ 출력 조건:
         - 각 항목은 반드시 `-`로 시작하는 개조식 문장으로 작성하세요.
+        - 주요 기능도 `-` 하나씩 줄바꿈하여 작성하세요.
         - 서술형 문장이나 설명식 요약은 절대 작성하지 마세요.
         - 최대한 간결하게 핵심만 요약해 주세요.
 
+        예시 1:
+        - 사용 기술 스택: Python, FastAPI
+        - 주요 기능:
+        - 사용자 요청 처리
+        - 루트 경로 응답 반환
+        - 프로젝트 내 역할: API 서버의 진입점 구성
+
+        예시 2:
+        - 사용 기술 스택: JavaScript, React
+        - 주요 기능:
+        - UI 렌더링
+        - 컴포넌트 구성
+        - 프로젝트 내 역할: 프론트엔드 애플리케이션의 메인 화면 구성
+
+        예시 3:
+        - 사용 기술 스택: Java, Spring Boot
+        - 주요 기능:
+        - REST API 제공
+        - 경로별 컨트롤러 응답 처리
+        - 프로젝트 내 역할: 서버 측 비즈니스 로직의 엔드포인트 구현
+
         [코드]
         {latest_code}
+
+        코드 요약: 
         """
+
         return prompt
 
     @classmethod
@@ -39,16 +64,23 @@ class LanggraphPrompts:
         prompt = f"""
         다음은 한 소스코드 파일에 대한 변경 요약입니다.
 
-        - 최근 커밋 메시지: {commit_message}
+        - 최근 커밋 메시지: API 응답 포맷 개선 및 불필요한 코드 제거
 
         [최신 코드 요약]
-        {code_summary}
+        - 사용 기술 스택: Python, FastAPI
+        - 주요 기능:
+        - GET 요청 응답 처리
+        - 예외 상황에 대한 JSON 응답 반환
+        - 프로젝트 내 역할: 클라이언트 요청에 대한 API 응답 포맷 제공
 
         [삭제된 코드 내용]
-        {before_code}
+        - print로 디버깅하던 로그 출력
+        - try-except 블록 없이 직접 응답 처리
 
         [추가된 코드 내용]
-        {after_code}
+        - FastAPI HTTPException을 활용한 오류 응답 처리
+        - 응답 메시지를 통일된 포맷으로 구성
+        - 불필요한 콘솔 로그 제거
 
         요구사항:
         - 아래 항목을 **개조식 문장**으로 자연스럽게 요약하세요.
@@ -63,6 +95,25 @@ class LanggraphPrompts:
         - API 응답 오류 처리 로직 추가
         - 기존 `print` 문 제거
         - 사용자 입력값 검증 로직 도입
+
+        ---
+
+        변경 내용 요약:
+        - API 오류 응답을 일관되게 처리하도록 구조 변경
+        - 기존 print 기반 디버깅 코드 제거
+        - HTTPException을 활용한 예외 처리 로직 도입
+        - 클라이언트에 전달되는 메시지 포맷 통일
+        - 사용자 경험 향상을 위한 응답 구조 개선
+
+        ---
+
+        [실제 입력]
+        - 최근 커밋 메시지: {commit_message}
+        - [최신 코드 요약]: {code_summary}
+        - [삭제된 코드 내용]: {before_code}
+        - [추가된 코드 내용]: {after_code}
+
+        변경 내용 요약:
         """
         return prompt
 
@@ -110,6 +161,8 @@ class LanggraphPrompts:
         6. 하루 회고
 
         작성 시 포함해야 할 항목 외에는 작성하지 마세요. 1번 항목부터 순차적으로 작성하세요. 이외 내용은 작성하지 마세요.
+        
+        TIL: 
         """
 
         return prompt
@@ -131,26 +184,6 @@ class LanggraphPrompts:
             """
         return prompt
 
-    @classmethod
-    def til_title_prompt(cls, content: str) -> str:
-        prompt = f"""
-        다음은 한 사용자가 작성한 TIL(Today I Learned)입니다.
-
-        이 내용을 바탕으로 **기술적인 핵심 주제를 담은 블로그 글 스타일의 제목**을 작성해 주세요.
-
-        요구 조건:
-        - 반드시 **한 줄짜리 제목만 출력**하세요.
-        - 절대로 '답변:', '제목:', '---', '###', 따옴표, 마크다운 기호(**, *, `) 등을 포함하지 마세요.
-        - 문장 끝은 '~다'처럼 끝나지 않도록 하세요. **명사구나 간결한 기술 용어 조합으로 끝나야 합니다.**
-        - 예시:
-        - React에서 상태 관리 방식 실습
-        - Kakao Maps를 활용한 위치 기반 마커 표시 기능 구현
-        - Axios 에러 처리 방식 개선과 UI 반영
-
-        [TIL 내용]
-        {content}
-        """
-        return prompt
     
     @classmethod
     def til_keywords_prompt(cls, content: str) -> str:
@@ -165,6 +198,8 @@ class LanggraphPrompts:
 
     [TIL 내용]
     {content}
+
+    키워드 리스트:
     """
         return prompt
 

@@ -33,6 +33,7 @@ def clean_llm_output(output: str) -> str:
     # 마크다운 구분선/헤더 제거
     output = re.sub(r"^---+", "", output, flags=re.MULTILINE)
     output = re.sub(r"^#+ .*", "", output, flags=re.MULTILINE)
+    output = output.replace("```", "").replace("'''", "")
     # "답변:", "제목:" 등 앞 단어 제거
     output = re.sub(r"(?i)^.*?[:：]", "", output, count=1)
     # 슬래시(/) 제거 또는 대체
@@ -69,10 +70,8 @@ class Langgraph:
         for i in range(max_nodes):
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
 
-        builder.add_node("genrate_title_node", self.genrate_title_node)
         builder.add_node("til_keywords_node", self.til_keywords_node)
-        builder.add_edge("til_draft_node", "genrate_title_node")
-        builder.add_edge("genrate_title_node", "til_keywords_node")
+        builder.add_edge("til_draft_node", "til_keywords_node")
 
         builder.add_node("embedding_til_node", self.embed_and_store_in_qdrant_node)
         builder.add_edge("til_keywords_node", "embedding_til_node")
@@ -170,7 +169,7 @@ class Langgraph:
         temperature=0.3,
         top_p=0.7,
         # top_k=20,
-        max_tokens=2048,
+        max_tokens=4096,
         repetition_penalty = 1.2,
         stop=["<eos>", "<pad>"]
         )
@@ -180,39 +179,18 @@ class Langgraph:
         patch_summaries = state.patch_summary
         prompt = self.prompts.til_draft_prompt(username, date, repo, patch_summaries)
         draft_json_str = await self.model.generate_til(prompt, params)
+        # Til 끝에 ''' 제거
+        draft_json_str = draft_json_str.replace("```", "").replace("'''", "")
 
         parsed = TilJsonModel(
         username=username,
         date=date,
         repo=repo,
-        title="",
         keywords="",
         content=draft_json_str,
         vector=[])
 
         return {"til_json": parsed}
-
-    @traceable
-    async def genrate_title_node(self, state: StateModel) -> dict:
-        params = SamplingParams(
-        temperature=0.3,
-        top_p=0.9,
-        # top_k=20,
-        max_tokens=32,
-        repetition_penalty = 1.05,
-        stop=["<eos>", "<pad>"]
-        )
-        til_json = state.til_json
-        try:
-            prompt = self.prompts.til_title_prompt(til_json.content)
-            til_title = await self.model.generate_til(prompt, params)
-            # 특수문자 제거 함수 적용
-            til_title = clean_llm_output(til_title)
-            til_json.title = til_title
-            return {"til_json": state.til_json}
-        except Exception as e:
-            logger.error(f"Title 생성 실패: {e}")
-            return {"til_json": {"error": f"Title 생성 실패: {str(e)}"}}
         
     @traceable
     async def til_keywords_node(self, state: StateModel) -> dict:
@@ -253,9 +231,8 @@ class Langgraph:
         if not til_json:
             raise ValueError("til_json is missing from state")
 
-        title = til_json.title
         content = til_json.content
-        text = f"query: {title}\n{content}"
+        text = f"query: {content}"
 
         try:
             embedding = await self.model.get_embedding(text)

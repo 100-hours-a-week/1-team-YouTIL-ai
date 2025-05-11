@@ -38,7 +38,6 @@ class TilJsonModel(BaseModel):
     username: str
     date: str
     repo: str
-    title: str
     keywords: Union[str, List[str]] #List[str]
     content: str
     vector: List[float]
