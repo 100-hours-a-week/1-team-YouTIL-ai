@@ -13,7 +13,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 class ModelConfig:
-    GEMMA_PATH: str = os.getenv("GEMMA_MODEL_12B_GPTQ_PATH")
+    GEMMA_PATH: str = os.getenv("GEMMA_MODEL_4B_PATH")
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     
     # VLLM 설정
