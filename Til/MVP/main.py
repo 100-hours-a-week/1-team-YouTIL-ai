@@ -3,10 +3,12 @@ from state_types import *
 from Langgraph_nodes import *
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from discord_client import DiscordClient
 from prometheus_fastapi_instrumentator import Instrumentator
 from model import *
 from dotenv import load_dotenv
 import uvicorn
+import asyncio
 import nest_asyncio
 import os
 import httpx
@@ -20,6 +22,9 @@ load_dotenv()
 app = FastAPI(debug=True)
 # 프로메테우스 연동
 Instrumentator().instrument(app).expose(app)
+
+discord_client = DiscordClient()
+asyncio.create_task(discord_client.start(os.getenv("DISCORD_BOT_TOKEN")))
 
 async def send_discord_notification(content: str):
     if not DISCORD_WEBHOOK_URL:
@@ -48,7 +53,11 @@ async def process_til(data: StateModel):
         til_json = result["til_json"]
         til_json_dict = til_json.dict(exclude={"vector"})
 
-        await send_discord_notification(f'생성자: {til_json_dict["username"]} \nTil 본문 내용: {til_json_dict["content"]}')
+        # Discord 스레드 전송 (username, content 전달)
+        await discord_client.send_til_to_thread(
+            content=til_json_dict["content"],
+            username=til_json_dict["username"]
+        )
         
         return til_json_dict
         
