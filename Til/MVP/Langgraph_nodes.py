@@ -65,17 +65,13 @@ class Langgraph:
             builder.add_node(f"patch_summary_node{i+1}", self.make_patch_summary_node(i+1))
             builder.add_edge("fork", f"code_summary_node{i+1}")
             builder.add_edge(f"code_summary_node{i+1}", f"patch_summary_node{i+1}")
-
         builder.add_node("til_draft_node", self.til_draft_node)
         for i in range(max_nodes):
             builder.add_edge(f"patch_summary_node{i+1}", "til_draft_node")
-
         builder.add_node("til_keywords_node", self.til_keywords_node)
         builder.add_edge("til_draft_node", "til_keywords_node")
-
         builder.add_node("embedding_til_node", self.embed_and_store_in_qdrant_node)
         builder.add_edge("til_keywords_node", "embedding_til_node")
-
         builder.set_finish_point("embedding_til_node")
         return builder.compile()
 
@@ -98,7 +94,8 @@ class Langgraph:
             top_p=0.7,
             max_tokens=512,
             repetition_penalty = 1.1,
-            stop=["<eos>", "<pad>"]
+            stop=["<eos>", "<pad>", "```", "<```>"],
+            stop_token_ids = [12234, 2, 7243, 2717]
             )
 
             file = next(file for file in state.files if file.node_id == node_id)
@@ -118,7 +115,8 @@ class Langgraph:
 
             max_tokens=512,
             repetition_penalty = 1.1,
-            stop=["<eos>", "<pad>"]
+            stop=["<eos>", "<pad>", "```", "<```>"],
+            stop_token_ids = [12234, 2, 7243, 2717]
             )
 
             files = state.files
@@ -169,9 +167,10 @@ class Langgraph:
         temperature=0.3,
         top_p=0.7,
         # top_k=20,
-        max_tokens=4096,
+        max_tokens=2048,
         repetition_penalty = 1.2,
-        stop=["<eos>", "<pad>"]
+        stop=["<eos>", "<pad>", "```", "<```>"],
+        stop_token_ids = [12234, 2, 7243, 2717]
         )
         username = state.username
         date = state.date
@@ -197,9 +196,10 @@ class Langgraph:
         params = SamplingParams(
             temperature=0.3,
             top_p=0.9,
-            max_tokens=64,
+            max_tokens=32,
             repetition_penalty= 1.2,
-            stop=["<eos>", "<pad>"]
+            stop=["<eos>", "<pad>", "```", "<```>"],
+            stop_token_ids = [12234, 2, 7243, 2717]
         )
 
         content = state.til_json.content
@@ -213,7 +213,7 @@ class Langgraph:
             try:
                 parsed = ast.literal_eval(keywords_output)
                 if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
-                    state.til_json.keywords = parsed
+                    state.til_json.keywords = parsed[:3]
                     break  # 파싱 성공
                 else:
                     raise ValueError("응답이 리스트 형식이 아님")
