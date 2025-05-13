@@ -2,6 +2,7 @@ from Prompts import *
 from state_types import *
 from Langgraph_nodes import *
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from model import *
 from dotenv import load_dotenv
@@ -29,6 +30,10 @@ async def send_discord_notification(content: str):
 
 model = get_til_model()
 
+@app.get("/health", tags=["Health"])
+async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
 @app.post("/til")
 async def process_til(data: StateModel):
     try:
@@ -42,8 +47,8 @@ async def process_til(data: StateModel):
         # vector만 제외하고 dict로 반환
         til_json = result["til_json"]
         til_json_dict = til_json.dict(exclude={"vector"})
-        
-        await send_discord_notification(til_json_dict["content"])
+
+        await send_discord_notification(f"생성자: {til_json_dict["username"]} \n Til 본문 내용: {til_json_dict["content"]}")
         
         return til_json_dict
         
@@ -54,4 +59,3 @@ async def process_til(data: StateModel):
 if __name__ == "__main__":
     nest_asyncio.apply()
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
