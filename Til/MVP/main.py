@@ -48,7 +48,7 @@ async def process_til(data: StateModel):
         til_json = result["til_json"]
         til_json_dict = til_json.dict(exclude={"vector"})
 
-        await send_discord_notification(f"생성자: {til_json_dict["username"]} \n Til 본문 내용: {til_json_dict["content"]}")
+        await send_discord_notification(f'생성자: {til_json_dict["username"]} \nTil 본문 내용: {til_json_dict["content"]}')
         
         return til_json_dict
         

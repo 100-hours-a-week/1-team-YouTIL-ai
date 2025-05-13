@@ -196,7 +196,7 @@ class Langgraph:
         params = SamplingParams(
             temperature=0.3,
             top_p=0.9,
-            max_tokens=64,
+            max_tokens=32,
             repetition_penalty= 1.2,
             stop=["<eos>", "<pad>", "```", "<```>"],
             stop_token_ids = [12234, 2, 7243, 2717]
