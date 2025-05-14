@@ -2,4 +2,6 @@ deeplearning/
 
 .env
 
+requirements.txt
+
 data_question_backup.json
