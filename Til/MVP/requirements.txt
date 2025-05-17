@@ -18,3 +18,4 @@ numpy==1.26.4
 scipy==1.15.2
 aiohttp==3.11.16
 tqdm==4.67.1
+discord==2.3.2

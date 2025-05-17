@@ -12,3 +12,5 @@ __pycache__/
 
 # 시스템
 .DS_Store
+
+grafana/
