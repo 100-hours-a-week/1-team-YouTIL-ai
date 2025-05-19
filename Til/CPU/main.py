@@ -3,9 +3,7 @@ from state_types import StateModel
 from Langgraph_nodes import Langgraph
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from discord_client import DiscordClient
-from prometheus_fastapi_instrumentator import Instrumentator
-from model import *
+from model import LLM
 from dotenv import load_dotenv
 import uvicorn
 import asyncio
@@ -21,30 +19,9 @@ import traceback
 load_dotenv()
 app = FastAPI(debug=True)
 # 프로메테우스 연동
-Instrumentator().instrument(app).expose(app)
+# Instrumentator().instrument(app).expose(app)
 
-NUM_CPU_THREADS = os.cpu_count() 
-
-class LLM:
-    def __init__(self):
-        self.model = Llama(
-            model_path="/home/a01088415234/models/gemma-3-4b-it-gguf/gemma-3-4b-it-Q4_K_M.gguf",
-            n_gpu_layers=-1,           # GPU 전체 사용
-            n_threads=NUM_CPU_THREADS, # CPU 병렬 처리
-            n_batch=128,               # 배치 크기
-            n_ctx=4096                 # 컨텍스트 길이
-        )
-
-    def generate(self, prompt: str, max_tokens: int = 512) -> str:
-        """LLM 모델로부터 응답 생성"""
-        response = self.model(
-            prompt,
-            max_tokens=max_tokens,
-            stop=["<eos>", "</s>", "###"],
-            temperature=0.7,
-            top_p=0.9
-        )
-        return response["choices"][0]["text"].strip()
+model = LLM()
 
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -53,9 +30,9 @@ async def health_check():
 @app.post("/til")
 async def process_til(data: StateModel):
     try:
-        files_num = len(data.files)
+        # files_num = len(data.files)
         # Langgraph 초기화
-        graph = Langgraph(files_num = files_num)
+        graph = Langgraph(model)
         
         # Langgraph 실행
         result = await graph.graph.ainvoke(data)

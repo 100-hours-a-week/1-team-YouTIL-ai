@@ -2,27 +2,12 @@ import re
 import logging
 import ast
 
+from model import LLM
 from Prompts import LanggraphPrompts
 from state_types import StateModel, TilJsonModel
 from langsmith import traceable
 from langgraph.graph import StateGraph
 
-async def gen(prompt, max_tokens):
-    answer = ""
-    stream = llm(prompt,
-                 max_tokens=max_tokens,
-                 stop=['<end_of_turn>', '<|im_end|>', '```', "<eos>", "<|endoftext|>"],
-                 echo=True,
-                 temperature=0.3,
-                 frequency_penalty = 0.9,
-                 repeat_penalty=1.1,
-                 top_p=0.98,
-                 stream=True)
-    for chunk in stream:
-        answer += chunk['choices'][0]['text']
-        print(chunk['choices'][0]['text'], end='', flush=True)
-        
-    return answer
 
 
 def extract_before_after(diff_lines):
@@ -65,8 +50,9 @@ def clean_llm_output(output: str) -> str:
     return output.strip()
 
 class Langgraph:
-    def __init__(self):
+    def __init__(self, model):
         self.prompts = LanggraphPrompts()
+        self.model = model
         # self.model = model
         # self.client = QdrantClient(host="104.154.17.188", port=6333)
         # self.files_num = files_num
@@ -135,7 +121,7 @@ class Langgraph:
             })
 
         prompt = self.prompts.make_til_draft(date, final)
-        draft_json_str = await gen(prompt, 2048)
+        draft_json_str = await self.model.generate(prompt, 2048)
 
         parsed = TilJsonModel(
         username=username,
@@ -154,7 +140,7 @@ class Langgraph:
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
-            keywords_output = await gen(prompt, 64)
+            keywords_output = await self.model.generate(prompt, 64)
             keywords_output = clean_llm_output(keywords_output)
 
             try:
