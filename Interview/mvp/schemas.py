@@ -7,7 +7,6 @@ class ContentState(BaseModel):
 
 class QAState(BaseModel):
     email: str
-    date: str
     level: int
     title: str
     keywords: List[str]
