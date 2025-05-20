@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-base_llm = os.getenv("MODEL_PATH")
+base_llm = os.getenv("MODEL2_PATH")
 
 engine_args = AsyncEngineArgs(
     model=base_llm,
