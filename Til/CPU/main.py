@@ -30,9 +30,9 @@ async def health_check():
 @app.post("/til")
 async def process_til(data: StateModel):
     try:
-        # files_num = len(data.files)
+        files_num = len(data.files)
         # Langgraph 초기화
-        graph = Langgraph(model)
+        graph = Langgraph(files_num, model)
         
         # Langgraph 실행
         result = await graph.graph.ainvoke(data)
