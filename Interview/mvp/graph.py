@@ -126,7 +126,7 @@ class QAFlow:
 
             sampling_params = SamplingParams(
                 temperature=0.7,
-                max_tokens=256,
+                max_tokens=512,
                 stop_token_ids=[2]
             )
 
