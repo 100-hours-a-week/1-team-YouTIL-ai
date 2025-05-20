@@ -12,7 +12,7 @@ graph = qa_flow.build_graph()
 
 app = FastAPI(debug=True)
 
-@app.post("/generate")
+@app.post("/interview")
 async def generate(data: QAState):
     try:
         result = await graph.ainvoke(data)
