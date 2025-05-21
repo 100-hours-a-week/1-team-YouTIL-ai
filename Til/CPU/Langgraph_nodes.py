@@ -8,8 +8,6 @@ from state_types import StateModel, TilJsonModel
 from langsmith import traceable
 from langgraph.graph import StateGraph
 
-
-
 def extract_before_after(diff_lines):
     before_lines = []
     after_lines = []
@@ -29,6 +27,27 @@ def extract_before_after(diff_lines):
         elif line.startswith('+') and not line.startswith('+++'):
             after_lines.append(line[1:].strip())
     return before_lines, after_lines
+
+def clean_keywords_output(keywords: str) -> str:
+    lines = keywords.strip().split('\n')
+
+    keywords = []
+    for line in lines:
+        # 1. 숫자. 제거 (줄 맨 앞에 있는 "숫자. " 패턴만 제거)
+        line = re.sub(r'^\s*\d+\.\s*', '', line)
+
+        # 2. 좌우 공백 + 불필요한 기호 제거: -, ", '
+        line = line.strip().lstrip('-').strip().strip('"').strip("'").strip()
+
+        # 3. 괄호 처리: "함수 (설명)" → "함수", "설명"
+        match = re.match(r'(.+?)\s*\((.+?)\)', line)
+        if match:
+            main, extra = match.groups()
+            keywords.append(main.strip())
+            keywords.append(extra.strip())
+        else:
+            keywords.append(line)
+    return keywords
 
 # 특수 문제 전처리 함수(제목, 키워드)
 def clean_llm_output(output: str) -> str:
@@ -86,7 +105,6 @@ class Langgraph:
 
         return builder.compile()
 
-    @traceable
     def fork_code_nodes(self, state: StateModel) -> StateModel:
         return state.model_copy(
             update={
@@ -96,7 +114,9 @@ class Langgraph:
                 ]
             }
         )
+    
     def make_til_draft_node(self, node_id: int):
+        @traceable(run_type='llm')
         async def til_draft_node(state: StateModel) -> dict:
             files = state.files
             file_entry = next(file for file in files if file.node_id == node_id)
@@ -131,14 +151,23 @@ class Langgraph:
                 })
 
             prompt = self.prompts.make_til_draft(date, final)
-            draft_json_str = await self.model.generate(prompt, 2048)
+            draft_json_str = await self.model.generate(prompt, 
+                                                    max_tokens=2024,
+                                                    temperature=0.3,
+                                                    top_p=0.9,
+                                                    frequency_penalty=0.3,
+                                                    repeat_penalty=1.1,
+                                                    stop=["</s>", "---"])
+
 
             file_entry.til_content = draft_json_str.strip()
 
-            return {"status": "ok", "node_id": node_id}
+            return {
+            "til_content": file_entry.til_content
+            }
         return til_draft_node
 
-    @traceable
+    @traceable(run_type='llm')
     async def generate_final_til_node(self, state: StateModel) -> dict:
         username = state.username
         date = state.date
@@ -168,39 +197,62 @@ class Langgraph:
         # 전체 TIL 본문 구성
         combined_content = f"# {date} TIL by {username}\n\n" + "\n".join(sections)
         prompt = self.prompts.make_final_til_prompt(date, combined_content)
-        final_til = await self.model.generate(prompt, 4096)
+        final_til = await self.model.generate(prompt, 
+                                                    max_tokens=4096,
+                                                    temperature=0.3,
+                                                    top_p=0.9,
+                                                    frequency_penalty=0.3,
+                                                    repeat_penalty=1.1,
+                                                    stop=["</s>", "---"])
 
         til_json = TilJsonModel(
             username=username,
             date=date,
             repo=repo,
             keywords=[],  # 다음 노드에서 추출
-            content=final_til
+            content=final_til,
+            vector=[]
         )
 
-        return {"til_final": til_json}
+        return {"til_json": til_json}
 
     async def til_keywords_node(self, state: StateModel) -> dict:
-
         content = state.til_json.content
         prompt = LanggraphPrompts.til_keywords_prompt(content)
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
-            keywords_output = await self.model.generate(prompt, 64)
-            keywords_output = clean_llm_output(keywords_output)
+            keywords_output = await self.model.generate(prompt, 
+                                                    max_tokens=64,
+                                                    temperature=0.3,
+                                                    top_p=0.9,
+                                                    frequency_penalty=0.3,
+                                                    repeat_penalty=1.1,
+                                                    stop=["</s>", "---"])
+            
+            keywords_output = clean_keywords_output(keywords_output)
 
             try:
-                parsed = ast.literal_eval(keywords_output)
+                # case 1: 이미 list인 경우
+                if isinstance(keywords_output, list):
+                    parsed = keywords_output
+                # case 2: 문자열인 경우
+                elif isinstance(keywords_output, str):
+                    parsed = ast.literal_eval(keywords_output)
+                else:
+                    raise ValueError(f"지원하지 않는 타입: {type(keywords_output)}")
+
+                # 리스트 유효성 검사
                 if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
                     state.til_json.keywords = parsed[:3]
-                    break  # 파싱 성공
+                    break
                 else:
-                    raise ValueError("응답이 리스트 형식이 아님")
+                    raise ValueError("리스트 안에 문자열이 아닌 값이 있음")
+
             except Exception as e:
                 logging.warning(f"[til_keywords_node] 키워드 파싱 실패 (시도 {attempt}/{max_attempts}): {e}")
                 if attempt == max_attempts:
                     logging.error("[til_keywords_node] 키워드 파싱 3회 실패, 원본 문자열 저장")
-                    state.til_json.keywords = keywords_output.strip()
+                    state.til_json.keywords = str(keywords_output).strip()
 
         return {"til_json": state.til_json}
