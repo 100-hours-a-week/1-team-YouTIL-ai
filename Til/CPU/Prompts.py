@@ -2,91 +2,79 @@ class LanggraphPrompts:
     @classmethod
     def make_til_draft(
         cls,
-        date: str,
         final,
         ) -> str:
         
-        til_prompt = f"""
-        다음은 하나의 소스코드 파일에 대한 변경 이력과 코드 내용입니다. 아래 정보를 바탕으로 TIL 작성을 위한 핵심 내용을 정리해 주세요.
+        return f"""
+    The following is the commit history and code content of a single source code file. Based on this, please summarize the key information needed to write a TIL (Today I Learned) entry.
 
-        [입력 정보]
-        - 최근 커밋 메시지: {final["code_changes"][0]["commit_message"]}
-        - [코드]: {final["latest_code"]}
-        - [삭제된 코드 내용]: {final["code_changes"][0]["before_code"]}
-        - [추가된 코드 내용]: {final["code_changes"][0]["after_code"]}
+    [Input Information]
+    - Commit message: {final["code_changes"][0]["commit_message"]}
+    - Previous code: {final["code_changes"][0]["before_code"]}
+    - Modified code: {final["code_changes"][0]["after_code"]}
+    - Current code: {final["latest_code"]}
 
+    ---
 
-요구 사항: 다음 항목들을 **문장 형식 또는 개조식 문장**으로 정리해 주세요. 각 항목은 반드시 번호와 제목으로 구분하여 출력하세요.
+    Please summarize the following items:
 
----
+    1. Purpose of change: Briefly explain why the change was made  
+    2. Summary of code changes: Summarize the removed/added functionality  
+    3. Tech stack used: Languages and libraries used  
+    4. Key functionalities: List the main functions in one line each  
+    5. Role in the project: Describe the function of this file in the overall system
 
-# 📌 변경 목적  
-- 이 변경이 왜 이루어졌는지 간단히 설명해 주세요.  
-  (예: 코드 구조 개선, 성능 최적화, 새로운 기능 도입 등)
+    **Instructions:**
+    - Include the number and title for each item.
+    - Write each item clearly without indentation.
+    - Do not use markdown, code blocks, or any special characters.
+    - **Write your response in English.**
 
-# 🧩 코드 변경 요약  
-- 어떤 기능이 제거되었고, 어떤 기능이 새로 추가되었는지 한 줄씩 정리해 주세요.
-
-# 🧪 사용 기술 스택  
-- 이 파일에서 사용된 프로그래밍 언어 및 라이브러리를 나열해 주세요.  
-  (예: Python, FastAPI, Pydantic 등)
-
-# ⚙️ 주요 기능  
-- 이 파일은 어떤 기능을 수행하나요? 핵심 동작을 한 줄씩 나열해 주세요.
-
-# 🧭 프로젝트 내 역할  
-- 이 파일이 전체 프로젝트에서 어떤 역할을 담당하는지 설명해 주세요.  
-  (예: 사용자 요청 처리, DB 연동, 인증 처리 등)
-
----
-
-⚠️ 출력 규칙:
-- 각 항목은 반드시 번호와 제목을 포함하세요 (예: `1. 📌 변경 목적`)
-- 각 항목의 본문은 들여쓰기 없이 시작하세요.
-- 문장은 간결하고 요점 중심으로 작성해 주세요.
-- 마크다운, 코드 블록 등은 사용하지 마세요.
-
-이 정보는 마크다운 형식의 TIL을 작성하는 데 사용됩니다.
-                
-        TIL:"""
-        return til_prompt
+    Now, please complete the following format:
+    """
+        
     @classmethod
     def make_final_til_prompt(cls, date: str, combined_content: str) -> str:
-        prompt = f"""
-다음은 하나 이상의 소스코드 파일에 대해 작성된 TIL 초안입니다. 이 초안들을 통합하여, 하루 동안 학습한 내용을 체계적으로 정리한 마크다운 TIL 문서를 작성해 주세요.
+        return f"""
+    The following is a draft TIL (Today I Learned) entry created from one or more source code files. Please integrate the contents to generate a structured and comprehensive TIL markdown document summarizing what was learned during the day.
 
-[날짜]
-{date}
+    [Date]
+    {date}
 
-[입력 초안]
-{combined_content}
+    [Input Drafts]
+    {combined_content}
 
-⚠️ 출력 규칙:
-- 각 줄은 절대 들여쓰기 없이 시작하세요.
-- 헤더는 `#`, `##`로 시작하고 공백 없이 맨 앞에 위치해야 합니다.
-- 본문도 줄 맨 앞에서 시작해야 하며, 불필요한 공백이나 탭을 포함하지 마세요.
+    ⚠️ Output Rules:
+    - Do not start any line with indentation.
+    - Use `#` and `###` for headers, and place them at the beginning of the line without any preceding spaces.
+    - Body text must also start at the beginning of the line without extra spaces or tabs.
+    - The output **must be written in English only**.
 
-TIL 작성 시 반드시 포함할 항목 (개조식):
-# 📅 {date} TIL
+    The TIL must include the following sections (in bullet-point style):
 
-## 📖 오늘 배운 내용
+    # 📅 {date} TIL
 
-## 📚 개념 정리
+    ### 📖 What I Learned Today
 
-## 🤔 해당 개념이 필요한 이유
+    ### 📚 Concept Summary
 
-## 💡 개념을 활용하는 방법
+    ### 🤔 Why This Concept Matters
 
-## 🛠️ 문제 해결 과정
+    ### 💡 How to Apply This Concept
 
-## ✍️ 하루 회고
+    ### 🛠️ Problem-Solving Process
 
-- 모든 항목을 순차적으로 빠짐없이 작성하세요.
-- 항목 외 다른 내용은 작성하지 마세요.
-- 들여쓰기 없이 간결하고 명확한 문장으로 구성하세요.
+    ### ✍️ Daily Reflection
 
-TIL:"""
-        return prompt
+    - Write all sections in the given order without skipping.
+    - Do not include any content outside these sections.
+    - Use concise and clear sentences without indentation.
+    - **For `Daily Reflection`, avoid subjective expressions like “It was helpful” or “I enjoyed it.” Instead, describe the tasks performed and the outcomes objectively, using a neutral and technical tone.**
+    - The output **must be in English only**.
+
+    Final TIL:
+    """
+
     
     @classmethod
     def til_keywords_prompt(cls, content: str) -> str:
@@ -102,7 +90,39 @@ TIL:"""
 
     [TIL 내용]
     {content}
-
     키워드 리스트:
+
     """
         return prompt
+    
+    @classmethod
+    def til_translate_prompt(cls, date:str, content: str) -> str:
+        return f"""
+        다음은 영어로 작성된 TIL(Today I Learned)입니다.
+
+        [TIL]
+        {content}
+
+        - 영어로 작성된 내용을 한국어로 **그대로 번역만 해주세요.**
+        - **형식(마크다운 구조)은 그대로 유지**하세요.
+        - 문장을 새로 만들거나 내용을 요약하거나 재작성하지 마세요.
+        - **객관적이고 보고서에 적합한 말투로 번역**해 주세요.
+        - 특히 `✍️ 회고` 항목은 감정을 배제하고 **기술적인 내용 그대로** 번역해 주세요.
+
+        **출력은 다음 마크다운 형식을 그대로 따르세요**
+        # 📅 {date} TIL
+
+        ### 📖 오늘 배운 내용
+
+        ### 📚 개념 정리
+
+        ### 🤔 해당 개념이 필요한 이유
+
+        ### 💡 개념을 활용하는 방법
+
+        ### 🛠️ 문제 해결 과정
+
+        ### ✍️ 회고
+
+        번역 결과:
+        """

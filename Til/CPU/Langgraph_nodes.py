@@ -72,7 +72,6 @@ class Langgraph:
     def __init__(self, num_files, model):
         self.prompts = LanggraphPrompts()
         self.model = model
-        # self.client = QdrantClient(host="104.154.17.188", port=6333)
         self.files_num = num_files
         self.graph = self._build_graph()
         
@@ -84,21 +83,22 @@ class Langgraph:
         builder.set_entry_point("fork")
         builder.add_node("fork", self.fork_code_nodes)
 
-        # 2. 병렬 draft 노드들 (최대 5개)
         max_nodes = min(self.files_num, 5)
         for i in range(max_nodes):
             node_name = f"draft_{i}"
             builder.add_node(node_name, self.make_til_draft_node(i))
             builder.add_edge("fork", node_name)
 
-        # 3. 종합 노드: til_final 구성
         builder.add_node("final_til_node", self.generate_final_til_node)
         for i in range(max_nodes):
             builder.add_edge(f"draft_{i}", "final_til_node")
 
+        builder.add_node("translate_til_node", self.translate_til_node)
+        builder.add_edge("final_til_node", "translate_til_node")
+
         # 4. 키워드 추출 노드
         builder.add_node("til_keywords_node", self.til_keywords_node)
-        builder.add_edge("final_til_node", "til_keywords_node")
+        builder.add_edge("translate_til_node", "til_keywords_node")
 
         # 5. 종료점
         builder.set_finish_point("til_keywords_node")
@@ -121,10 +121,7 @@ class Langgraph:
             files = state.files
             file_entry = next(file for file in files if file.node_id == node_id)
             
-            username = state.username
             date = state.date
-            repo = state.repo
-
 
             patches = file_entry.patches[0]
             latest_code = file_entry.latest_code
@@ -150,14 +147,15 @@ class Langgraph:
                     "after_code": "\n".join(after)
                 })
 
-            prompt = self.prompts.make_til_draft(date, final)
+            prompt = self.prompts.make_til_draft(final)
             draft_json_str = await self.model.generate(prompt, 
                                                     max_tokens=2024,
-                                                    temperature=0.3,
+                                                    temperature=0.6,
                                                     top_p=0.9,
                                                     frequency_penalty=0.3,
                                                     repeat_penalty=1.1,
-                                                    stop=["</s>", "---"])
+                                                    stop=[]
+                                                    )
 
 
             file_entry.til_content = draft_json_str.strip()
@@ -203,7 +201,8 @@ class Langgraph:
                                                     top_p=0.9,
                                                     frequency_penalty=0.3,
                                                     repeat_penalty=1.1,
-                                                    stop=["</s>", "---"])
+                                                    stop=[]
+                                                    )
 
         til_json = TilJsonModel(
             username=username,
@@ -216,10 +215,29 @@ class Langgraph:
 
         return {"til_json": til_json}
 
+    @traceable(run_type='llm')
+    async def translate_til_node(self, state: StateModel) -> dict:
+        date = state.date
+        content = state.til_json.content
+
+        prompt = self.prompts.til_translate_prompt(date, content)
+        final_til = await self.model.translate(prompt, 
+                                            max_tokens=2400,
+                                            temperature=0.3,
+                                            top_p=0.9,
+                                            frequency_penalty=0.3,
+                                            repeat_penalty=1.1,
+                                            stop=["**지시사항**"]
+                                            )
+        state.til_json.content = final_til
+
+        return {"til_json": state.til_json}
+
+
     async def til_keywords_node(self, state: StateModel) -> dict:
         content = state.til_json.content
         prompt = LanggraphPrompts.til_keywords_prompt(content)
-
+        
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
             keywords_output = await self.model.generate(prompt, 
@@ -228,9 +246,10 @@ class Langgraph:
                                                     top_p=0.9,
                                                     frequency_penalty=0.3,
                                                     repeat_penalty=1.1,
-                                                    stop=["</s>", "---"])
+                                                    stop=[]
+                                                    )
             
-            keywords_output = clean_keywords_output(keywords_output)
+            keywords_output = clean_llm_output(keywords_output)
 
             try:
                 # case 1: 이미 list인 경우
