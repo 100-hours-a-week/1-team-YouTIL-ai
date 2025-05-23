@@ -1,9 +1,30 @@
+from tenacity import retry, stop_after_attempt, wait_fixed
 from langgraph.graph import StateGraph
 from sentence_transformers import SentenceTransformer
 from uuid import uuid4
 from vllm import SamplingParams
 from schemas import QAState, ContentState
+import logging
 import re
+
+logger = logging.getLogger(__name__)
+
+# @retry(stop=stop_after_attempt(2), wait=wait_fixed(1))
+# async def wrap_llm_generate(llm, prompt, sampling_params) -> str:
+#     request_id = str(uuid4())
+#     try:
+#         logger.info(f"LLM 호출")
+
+#         async for output in llm.generate(
+#             prompt=prompt,
+#             sampling_params=sampling_params,
+#             request_id=request_id
+#         ):
+#             return output.outputs[0].text.strip()
+
+#     except Exception as e:
+#         logger.error(f"❌ LLM 호출 실패 | prompt 일부: {prompt[:40]}... | error: {e}")
+#         raise e
 
 class QAFlow:
     def __init__(self, llm, qdrant, templates):
@@ -19,20 +40,17 @@ class QAFlow:
         query = state.title + " " + " ".join(state.keywords)
         query_vector = self.embed_text(query)
 
-        collection_names = ["ai", "cloud", "frontend", "backend"]
-        best_score = 0.0
-        retrieved_texts = []
+        category = state.category 
 
-        for col in collection_names:
-            results = self.qdrant.search(
-                collection_name=col,
-                query_vector=query_vector,
-                limit=3,
-                with_payload=True
-            )
-            if results and results[0].score > best_score:
-                best_score = results[0].score
-                retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
+        results = self.qdrant.search(
+            collection_name=category,
+            query_vector=query_vector,
+            limit=3,
+            with_payload=True
+        )
+
+        retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
+        best_score = results[0].score if results else 0.0
 
         return {
             "similarity_score": best_score,
@@ -78,7 +96,7 @@ class QAFlow:
         async def question_node(state: QAState) -> dict:
             retrieved = "\n\n".join(state.retrieved_texts or [])
             
-            prompt1 = self.templates.question.format(
+            prompt1 = getattr(self.templates, f"question{node_id}_prompt").format(
                 til=state.til,
                 level=state.level,
                 retrieved=retrieved
@@ -100,10 +118,9 @@ class QAFlow:
             ):
                 final_text = output.outputs[0].text.strip()
 
-            cleaned_question = self.clean_korean_question(final_text)
+            # final_text = await wrap_llm_generate(self.llm, prompt1, sampling_params)
 
-            # print(node_id, final_text)
-            # print(node_id, cleaned_question)
+            cleaned_question = self.clean_korean_question(final_text)
 
             return {f"question{node_id}": cleaned_question}
 
@@ -111,13 +128,20 @@ class QAFlow:
 
     def generate_answer_node(self, node_id: int):
         async def answer_node(state: QAState) -> dict:
-            question = getattr(state, f"question{node_id}", None)
+            question = getattr(state, f"question{node_id}", "")
             if not question:
-                raise ValueError(f"질문 {node_id}가 없습니다.")
+                    logger.warning(f"⚠️ 질문 {node_id}가 비어 있음 → fallback 처리")
+                    return {
+                        f"content{node_id}": ContentState(
+                            question="[질문 없음]",
+                            answer="[답변 생성 실패]"
+                        )
+                    }
+                #raise ValueError(f"질문 {node_id}가 없습니다.")
 
             context = "\n\n".join(state.retrieved_texts or [])
 
-            prompt2 = self.templates.answer.format(
+            prompt2 = getattr(self.templates, f"answer{node_id}_prompt").format(
                 question=question,
                 til=state.til,
                 level=state.level,
@@ -139,12 +163,14 @@ class QAFlow:
                 request_id=request_id
             ):
                 final_text = output.outputs[0].text.strip()
+            
+            # final_text = await wrap_llm_generate(self.llm, prompt2, sampling_params)
 
             return {
-                #"content": [ContentState(question=question, answer=final_text)]
                 f"content{node_id}": ContentState(
                     question=question,
-                    answer=final_text)
+                    answer=final_text
+                )
             }
 
         return answer_node
@@ -179,6 +205,9 @@ class QAFlow:
             request_id=request_id
         ):
             final_text = output.outputs[0].text.strip()
+
+        # final_text = await wrap_llm_generate(self.llm, prompt3, sampling_params)
+
 
         return {
             "summary": final_text,
