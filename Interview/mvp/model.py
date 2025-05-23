@@ -1,4 +1,5 @@
 import os
+import logging
 from qdrant_client import QdrantClient
 from vllm import AsyncEngineArgs, AsyncLLMEngine
 from dotenv import load_dotenv
@@ -9,11 +10,11 @@ base_llm = os.getenv("MODEL2_PATH")
 
 engine_args = AsyncEngineArgs(
     model=base_llm,
-    tensor_parallel_size=1, # GPU 개수
+    tensor_parallel_size=1, 
     gpu_memory_utilization=0.95,
-    max_num_seqs = 100, # 동시에 받을 수 있는 요청 개수
-    max_model_len=4096, # input + output 토큰 길이
-    max_num_batched_tokens=8192) # 한 batch 당 토근 길이 
+    max_num_seqs = 32, 
+    max_model_len=4096,
+    max_num_batched_tokens=4096)
 
 llm = AsyncLLMEngine.from_engine_args(engine_args)
 
