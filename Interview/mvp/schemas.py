@@ -11,6 +11,7 @@ class QAState(BaseModel):
     title: str
     keywords: List[str]
     til: str
+    category: str
 
     retrieved_texts: Optional[List[str]] = None
     similarity_score: Optional[float] = None
