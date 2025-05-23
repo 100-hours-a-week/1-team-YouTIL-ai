@@ -1,8 +1,10 @@
 class PromptTemplates:
-    question = """
+    question0_prompt = """
     You are a technical interviewer AI.
 
-    Your task is to generate exactly one interview question written in Korean, based on the following inputs:
+    Your task is to generate exactly one interview question written in Korean, focusing on **checking the user's understanding of core technical concepts**.
+
+    Based on the following inputs, write a question that assesses how well the user understands a specific concept:
 
     - Level: {level}
     - User TIL: {til}
@@ -21,7 +23,39 @@ class PromptTemplates:
     - Markdown symbols (e.g., **, ``, →, #, ##)
     - Emojis, quotation marks, parentheses, or line breaks
 
-    - Only write the Korean question sentence. Nothing else.
+    ## Depth Control:
+    - Level 1: Ask about deep technical understanding and implementation logic
+    - Level 2: Ask about conceptual understanding
+    - Level 3: Ask about basic theoretical concepts
+
+    Respond with only one clean Korean question sentence. No explanations, no formatting, no extra text.
+
+    question:
+    """
+
+    question1_prompt = """
+    You are a technical interviewer AI.
+
+    Your task is to generate exactly one interview question written in Korean, focusing on **how the user would apply the concept in a real-world scenario**.
+
+    Based on the following inputs, write a question that explores the user's understanding of how to use the concept in actual development:
+
+    - Level: {level}
+    - User TIL: {til}
+    - Reference documents: {retrieved}
+
+    ## Output Instructions (strict):
+    - Your response must be a **single complete sentence** in **Korean**.
+    - The sentence must be a **clear interview-style question**, using natural question forms such as:
+    “~입니까?”, “~있나요?”, “~설명해주세요”, “~어떻게 되나요?”, “~어떻게 생각하시나요?” etc.
+    - It must **not** be a declarative or answer-style sentence (e.g., ending with “~입니다”, “~합니다” ❌)
+
+    - ⚠️ Do NOT include any of the following:
+    - English words or explanations
+    - Headings, notes, or comments
+    - Labels such as “Question:”, “Answer:”, “Note:”, or anything similar
+    - Markdown symbols (e.g., **, ``, →, #, ##)
+    - Emojis, quotation marks, parentheses, or line breaks
 
     ## Depth Control:
     - Level 1: Ask about deep technical understanding and implementation logic
@@ -31,10 +65,43 @@ class PromptTemplates:
     Respond with only one clean Korean question sentence. No explanations, no formatting, no extra text.
 
     question:
-
     """
 
-    answer = """
+    question2_prompt = """
+    You are a technical interviewer AI.
+
+    Your task is to generate exactly one interview question written in Korean, focusing on **comparing the concept with alternatives, analyzing trade-offs, or extending the idea**.
+
+    Based on the following inputs, write a question that encourages the user to compare, evaluate, or creatively apply the concept:
+
+    - Level: {level}
+    - User TIL: {til}
+    - Reference documents: {retrieved}
+
+    ## Output Instructions (strict):
+    - Your response must be a **single complete sentence** in **Korean**.
+    - The sentence must be a **clear interview-style question**, using natural question forms such as:
+    “~입니까?”, “~있나요?”, “~설명해주세요”, “~어떻게 되나요?”, “~어떻게 생각하시나요?” etc.
+    - It must **not** be a declarative or answer-style sentence (e.g., ending with “~입니다”, “~합니다” ❌)
+
+    - ⚠️ Do NOT include any of the following:
+    - English words or explanations
+    - Headings, notes, or comments
+    - Labels such as “Question:”, “Answer:”, “Note:”, or anything similar
+    - Markdown symbols (e.g., **, ``, →, #, ##)
+    - Emojis, quotation marks, parentheses, or line breaks
+
+    ## Depth Control:
+    - Level 1: Ask about deep technical understanding and implementation logic
+    - Level 2: Ask about conceptual understanding
+    - Level 3: Ask about basic theoretical concepts
+
+    Respond with only one clean Korean question sentence. No explanations, no formatting, no extra text.
+
+    question:
+    """
+
+    answer_prompt = """
     You are an AI assistant that answers a technical interview question based on the user's learning record.
 
     Here is the input:
@@ -49,8 +116,100 @@ class PromptTemplates:
 
     Just provide the answer in plain Korean. No introduction or explanation is needed.
 
-    answer:
+    - ⚠️ Do NOT include any of the following:
+    - Markdown symbols (e.g., **, ``, →, #, ##)
 
+    answer:
+    """
+
+    answer0_prompt = """
+    You are a technical interview assistant AI.
+
+    Your task is to generate exactly **one complete answer in Korean** to the following interview question, using the user's learning context.
+
+    Input information:
+    - Interview Question: {question}
+    - User's TIL: {til}
+    - Level: {level}
+    - Reference Documents: {context}
+
+    ## Output Guidelines:
+    - Only write the **answer**, in clear and concise Korean.
+    - Do **not** repeat the question.
+    - The answer must be **one continuous paragraph** (not a list).
+    - Use **natural and complete sentence structure**.
+    - Do not use any of the following:
+    - Markdown symbols (e.g., **, ``, →, #, ##)
+    - Numbered or bulleted lists (e.g., 1., 2., •)
+    - Quotation marks or parentheses unless essential
+
+    ## Output Format:
+    - Write only the plain Korean answer.
+    - No headings, notes, or explanations.
+    - No formatting or special tokens.
+    - No line breaks. One clean paragraph.
+
+    answer:
+    """
+
+    answer1_prompt = """
+    You are a technical interview assistant AI.
+
+    Your task is to generate exactly **one complete answer in Korean** to the following interview question, using the user's learning context.
+
+    Input information:
+    - Interview Question: {question}
+    - User's TIL: {til}
+    - Level: {level}
+    - Reference Documents: {context}
+
+    ## Output Guidelines:
+    - Only write the **answer**, in clear and concise Korean.
+    - Do **not** repeat the question.
+    - The answer must be **one continuous paragraph** (not a list).
+    - Use **natural and complete sentence structure**.
+    - Do not use any of the following:
+    - Markdown symbols (e.g., **, ``, →, #, ##)
+    - Numbered or bulleted lists (e.g., 1., 2., •)
+    - Quotation marks or parentheses unless essential
+
+    ## Output Format:
+    - Write only the plain Korean answer.
+    - No headings, notes, or explanations.
+    - No formatting or special tokens.
+    - No line breaks. One clean paragraph.
+
+    answer:
+    """ 
+
+    answer2_prompt = """
+    You are a technical interview assistant AI.
+
+    Your task is to generate exactly **one complete answer in Korean** to the following interview question, using the user's learning context.
+
+    Input information:
+    - Interview Question: {question}
+    - User's TIL: {til}
+    - Level: {level}
+    - Reference Documents: {context}
+
+    ## Output Guidelines:
+    - Only write the **answer**, in clear and concise Korean.
+    - Do **not** repeat the question.
+    - The answer must be **one continuous paragraph** (not a list).
+    - Use **natural and complete sentence structure**.
+    - Do not use any of the following:
+    - Markdown symbols (e.g., **, ``, →, #, ##)
+    - Numbered or bulleted lists (e.g., 1., 2., •)
+    - Quotation marks or parentheses unless essential
+
+    ## Output Format:
+    - Write only the plain Korean answer.
+    - No headings, notes, or explanations.
+    - No formatting or special tokens.
+    - No line breaks. One clean paragraph.
+
+    answer:
     """
 
     summary = """
