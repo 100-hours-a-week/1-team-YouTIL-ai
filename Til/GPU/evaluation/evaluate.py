@@ -1,8 +1,7 @@
 import json
-import csv
-from typing import Dict, List
+from typing import Dict
 from openai import OpenAI
-from tqdm.notebook import tqdm
+import pymysql
 
 class TilEvaluator:
   def __init__(self, open_api_key: str, content: str):
@@ -140,33 +139,86 @@ class TilEvaluator:
       except Exception as e:
           print(f"Error: 응답을 JSON으로 구문 분석할 수 없습니다. Response: {response[:100]}...")
           return None
-
+          
   @staticmethod
-  def save_evaluation_to_csv(evaluations: List[Dict], output_file: str):
-    if not evaluations:
-      print("저장할 평가 데이터가 없습니다.")
-      return
+  def insert_til_evaluation_to_db(evaluation: dict, metadata: dict, connection_info: dict):
+      conn = pymysql.connect(
+          host=connection_info["host"],
+          user=connection_info["user"],
+          password=connection_info["password"],
+          database=connection_info["database"],
+          charset='utf8mb4'
+      )
+      try:
+          with conn.cursor() as cursor:
+              sql = """
+              INSERT INTO til_evaluations (
+                  username, commit_date, repo, til_content,
+                  total_score, overall_evaluation, improvement_suggestions,
 
-    fieldnames = ["til_id", "total_score", "overall_evaluation", "improvement_suggestions"]
-    for criterion in evaluations[0]["scores"].keys():
-      fieldnames.extend([f"{criterion}_score", f"{criterion}_explanation"])
+                  topic_clarity_score, topic_clarity_explanation,
+                  motivation_score, motivation_explanation,
+                  core_concepts_score, core_concepts_explanation,
+                  clarity_score, clarity_explanation,
+                  terminology_score, terminology_explanation,
+                  summarization_score, summarization_explanation,
+                  conceptual_linking_score, conceptual_linking_explanation,
+                  problem_solving_score, problem_solving_explanation,
+                  structure_score, structure_explanation,
+                  markdown_consistency_score, markdown_consistency_explanation,
+                  reusability_score, reusability_explanation,
+                  practical_value_score, practical_value_explanation,
+                  reader_friendliness_score, reader_friendliness_explanation
+              ) VALUES (
+                  %(username)s, %(commit_date)s, %(repo)s, %(til_content)s,
+                  %(total_score)s, %(overall_evaluation)s, %(improvement_suggestions)s,
 
-    with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-      writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-      writer.writeheader()
+                  %(topic_clarity_score)s, %(topic_clarity_explanation)s,
+                  %(motivation_score)s, %(motivation_explanation)s,
+                  %(core_concepts_score)s, %(core_concepts_explanation)s,
+                  %(clarity_score)s, %(clarity_explanation)s,
+                  %(terminology_score)s, %(terminology_explanation)s,
+                  %(summarization_score)s, %(summarization_explanation)s,
+                  %(conceptual_linking_score)s, %(conceptual_linking_explanation)s,
+                  %(problem_solving_score)s, %(problem_solving_explanation)s,
+                  %(structure_score)s, %(structure_explanation)s,
+                  %(markdown_consistency_score)s, %(markdown_consistency_explanation)s,
+                  %(reusability_score)s, %(reusability_explanation)s,
+                  %(practical_value_score)s, %(practical_value_explanation)s,
+                  %(reader_friendliness_score)s, %(reader_friendliness_explanation)s
+              )
+              """
+              row_data = {
+                  **metadata,  # username, commit_date, repo
+                  "til_content": metadata["content"],
+                  "total_score": evaluation["total_score"],
+                  "overall_evaluation": evaluation["overall_evaluation"],
+                  "improvement_suggestions": evaluation["improvement_suggestions"],
+              }
 
-    for i, eval in enumerate(evaluations):
-      if eval is None:
-        print(f"대화에서 None인 {i+1} 대화 건너뛰기")
-        continue
-      row = {
-          "til_id": i,
-          "total_score": eval["total_score"],
-          "overall_evaluation": eval["overall_evaluation"],
-          "improvement_suggestions": eval["improvement_suggestions"]
-      }
+              for k, v in evaluation["scores"].items():
+                  col_prefix = {
+                      "주제 명확성": "topic_clarity",
+                      "학습 동기 서술": "motivation",
+                      "핵심 개념의 정확성": "core_concepts",
+                      "문장 명료도": "clarity",
+                      "기술 용어 사용 정확성": "terminology",
+                      "요점 정리 능력": "summarization",
+                      "개념 간 연계 설명": "conceptual_linking",
+                      "문제 해결 서술력": "problem_solving",
+                      "문서 구조의 완성도": "structure",
+                      "마크다운 형식 일관성": "markdown_consistency",
+                      "재사용 가능성": "reusability",
+                      "실용적 학습 가치": "practical_value",
+                      "독자 친화성": "reader_friendliness"
+                  }[k]
 
-      for criterion, scores in eval["scores"].items():
-        row[f"{criterion}_score"] = scores["score"]
-        row[f"{criterion}_explanation"] = scores["explanation"]
-    writer.writerow(row)
+                  row_data[f"{col_prefix}_score"] = v["score"]
+                  row_data[f"{col_prefix}_explanation"] = v["explanation"]
+
+              cursor.execute(sql, row_data)
+              conn.commit()
+              print("✅ 데이터 삽입 완료")
+
+      finally:
+          conn.close()
