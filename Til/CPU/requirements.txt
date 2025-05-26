@@ -1,0 +1,7 @@
+dotenv==0.9.9
+fastapi==0.115.12
+langgraph==0.4.5
+langsmith==0.3.42
+pydantic==2.11.4
+tqdm==4.67.1
+transformers==4.51.3
