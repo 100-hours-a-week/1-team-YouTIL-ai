@@ -4,35 +4,19 @@ from sentence_transformers import SentenceTransformer
 from uuid import uuid4
 from vllm import SamplingParams
 from schemas import QAState, ContentState
-from model import get_embedding_model
+from model import model
 import logging
 import re
 
 logger = logging.getLogger(__name__)
-
-# @retry(stop=stop_after_attempt(2), wait=wait_fixed(1))
-# async def wrap_llm_generate(llm, prompt, sampling_params) -> str:
-#     request_id = str(uuid4())
-#     try:
-#         logger.info(f"LLM 호출")
-
-#         async for output in llm.generate(
-#             prompt=prompt,
-#             sampling_params=sampling_params,
-#             request_id=request_id
-#         ):
-#             return output.outputs[0].text.strip()
-
-#     except Exception as e:
-#         logger.error(f"❌ LLM 호출 실패 | prompt 일부: {prompt[:40]}... | error: {e}")
-#         raise e
 
 class QAFlow:
     def __init__(self, llm, qdrant, templates):
         self.llm = llm
         self.qdrant = qdrant
         self.templates = templates
-        self.embedding_model = get_embedding_model(device="cpu")
+        self.embedding_model = model.embedder
+        #self.embedding_model = get_embedding_model(device="cpu")
 
     def embed_text(self, text: str) -> list[float]:
         return self.embedding_model.encode(text).tolist()
@@ -108,8 +92,6 @@ class QAFlow:
             ):
                 final_text = output.outputs[0].text.strip()
 
-            # final_text = await wrap_llm_generate(self.llm, prompt1, sampling_params)
-
             cleaned_question = self.clean_korean_question(final_text)
 
             return {f"question{node_id}": cleaned_question}
@@ -153,8 +135,6 @@ class QAFlow:
                 request_id=request_id
             ):
                 final_text = output.outputs[0].text.strip()
-            
-            # final_text = await wrap_llm_generate(self.llm, prompt2, sampling_params)
 
             return {
                 f"content{node_id}": ContentState(
@@ -195,9 +175,6 @@ class QAFlow:
             request_id=request_id
         ):
             final_text = output.outputs[0].text.strip()
-
-        # final_text = await wrap_llm_generate(self.llm, prompt3, sampling_params)
-
 
         return {
             "summary": final_text,

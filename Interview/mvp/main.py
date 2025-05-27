@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import traceback
 
-from model import llm, qdrant
+from model import model
 from prompt import PromptTemplates
 from graph import QAFlow
 from schemas import QAState, ContentState
 
-qa_flow = QAFlow(llm=llm, qdrant=qdrant, templates=PromptTemplates)
+# templates = PromptTemplates()
+
+qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
 
 app = FastAPI(debug=True)
