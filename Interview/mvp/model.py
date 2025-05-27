@@ -2,6 +2,7 @@ import os
 import logging
 from qdrant_client import QdrantClient
 from vllm import AsyncEngineArgs, AsyncLLMEngine
+from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +18,9 @@ engine_args = AsyncEngineArgs(
     max_num_batched_tokens=4096)
 
 llm = AsyncLLMEngine.from_engine_args(engine_args)
+
+def get_embedding_model(device="cpu"):
+    return SentenceTransformer("BAAI/bge-m3", device=device)
 
 qdrant = QdrantClient(
     host=os.getenv("QDRANT_HOST"), 
