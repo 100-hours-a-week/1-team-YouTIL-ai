@@ -20,13 +20,13 @@ class LLM:
             model_path= HYPERCLOVAX_SEED_Q4KM_PATH,
             n_gpu_layers=25,
             n_batch=128,
-            n_ctx=2048
+            n_ctx=4096
         )
 
     async def generate(
         self,
         prompt: str,
-        max_tokens: int = 2024,
+        max_tokens: int = 3000,
         temperature: float = 0.3,
         top_p: float = 0.95,
         frequency_penalty: float = 0.3,
