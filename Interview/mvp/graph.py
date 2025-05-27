@@ -4,6 +4,7 @@ from sentence_transformers import SentenceTransformer
 from uuid import uuid4
 from vllm import SamplingParams
 from schemas import QAState, ContentState
+from model import get_embedding_model
 import logging
 import re
 
@@ -31,19 +32,19 @@ class QAFlow:
         self.llm = llm
         self.qdrant = qdrant
         self.templates = templates
-        self.embedding_model = SentenceTransformer("BAAI/bge-m3", device="cpu")
+        self.embedding_model = get_embedding_model(device="cpu")
 
     def embed_text(self, text: str) -> list[float]:
         return self.embedding_model.encode(text).tolist()
 
     async def retriever_node(self, state: QAState) -> dict:
-        query = state.title + " " + " ".join(state.keywords)
+        query = state.til
         query_vector = self.embed_text(query)
 
-        category = state.category 
+        #category = state.category
 
         results = self.qdrant.search(
-            collection_name=category,
+            collection_name="knowledge_all",
             query_vector=query_vector,
             limit=3,
             with_payload=True
@@ -70,9 +71,6 @@ class QAFlow:
         # 문장 맨 앞 하이픈/번호 제거
         text = re.sub(r'^[-•\s]+\d*\s*', '', text)
 
-        # 괄호 level (띄어쓰기 포함) 제거
-        text = re.sub(r'\(\s*\d+\s*\)', '', text)
-
         # 기타 특수문자 제거
         text = text.replace("`", "").replace("“", "").replace("”", "")
         text = text.replace("👉", "").replace("→", "").strip()
@@ -80,14 +78,6 @@ class QAFlow:
 
         # 줄 단위로 나누기
         lines = [line.strip() for line in text.split('\n') if line.strip()]
-
-        question_endings = ["?", "요.", "습니까", "설명해주세요", "어떻게", "무엇", 
-                            "설명하시오", "구현하시오", "알려주세요", "어떤가요", "왜 그런가요"]
-        
-        # 완결된 질문형 문장만 탐색
-        for line in lines:
-            if any(ending in line for ending in question_endings):
-                return line
 
         return lines[0] if lines else ""
 
