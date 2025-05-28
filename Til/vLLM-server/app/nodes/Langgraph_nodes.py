@@ -1,13 +1,14 @@
-import json
+import os
 import uuid
 import re
-from Prompts import *
-from state_types import *
-from model import *
+from app.prompts.Prompts import LanggraphPrompts
+from app.schemas.state_types import TilJsonModel, StateModel, PatchSummaryModel
+from app.models.model import TILModels
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from langsmith import traceable
 from langgraph.graph import StateGraph
+from vllm import SamplingParams
 import logging
 import ast
 
@@ -47,7 +48,7 @@ class Langgraph:
     def __init__(self, files_num, model: TILModels):
         self.prompts = LanggraphPrompts()
         self.model = model
-        self.client = QdrantClient(host="104.154.17.188", port=6333)
+        self.client = QdrantClient(host=os.getenv("DB_SERVER_IP"), port=6333)
         self.files_num = files_num
         self.graph = self._build_graph()
         
