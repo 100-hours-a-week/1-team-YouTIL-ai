@@ -1,4 +1,4 @@
-import json
+import os
 import uuid
 import re
 from Prompts import *
@@ -47,7 +47,7 @@ class Langgraph:
     def __init__(self, files_num, model: TILModels):
         self.prompts = LanggraphPrompts()
         self.model = model
-        self.client = QdrantClient(host="104.154.17.188", port=6333)
+        self.client = QdrantClient(host=os.getenv("DB_SERVER_IP"), port=6333)
         self.files_num = files_num
         self.graph = self._build_graph()
         
