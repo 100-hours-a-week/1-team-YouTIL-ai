@@ -7,8 +7,6 @@ from prompt import PromptTemplates
 from graph import QAFlow
 from schemas import QAState, ContentState
 
-# templates = PromptTemplates()
-
 qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
 

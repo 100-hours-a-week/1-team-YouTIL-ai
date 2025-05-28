@@ -1,6 +1,6 @@
 from tenacity import retry, stop_after_attempt, wait_fixed
 from langgraph.graph import StateGraph
-from sentence_transformers import SentenceTransformer
+from langsmith import traceable
 from uuid import uuid4
 from vllm import SamplingParams
 from schemas import QAState, ContentState
@@ -16,7 +16,6 @@ class QAFlow:
         self.qdrant = qdrant
         self.templates = templates
         self.embedding_model = model.embedder
-        #self.embedding_model = get_embedding_model(device="cpu")
 
     def embed_text(self, text: str) -> list[float]:
         return self.embedding_model.encode(text).tolist()
@@ -42,7 +41,6 @@ class QAFlow:
             "retrieved_texts": retrieved_texts
         }
     
-    # 후처리 추가 
     def clean_korean_question(self, text: str) -> str:
 
         text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -65,8 +63,8 @@ class QAFlow:
 
         return lines[0] if lines else ""
 
-
     def generate_question_node(self, node_id: int):
+        @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")
         async def question_node(state: QAState) -> dict:
             retrieved = "\n\n".join(state.retrieved_texts or [])
             
@@ -99,6 +97,7 @@ class QAFlow:
         return question_node
 
     def generate_answer_node(self, node_id: int):
+        @traceable(name=f"답변 생성 노드 {node_id}", run_type="llm")
         async def answer_node(state: QAState) -> dict:
             question = getattr(state, f"question{node_id}", "")
             if not question:
@@ -145,6 +144,7 @@ class QAFlow:
 
         return answer_node
 
+    @traceable(name="요약 생성 노드", run_type="llm")
     async def summary_node(self, state: QAState) -> dict:
         merged = []
         for i in range(3):
