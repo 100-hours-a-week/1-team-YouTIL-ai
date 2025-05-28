@@ -66,7 +66,7 @@ class TILModels:
                 request_id=request_id
             ):
                 text_chunk = output.outputs[0].text
-                full_text = text_chunk  # 보통 vLLM은 이전까지 누적된 전체 텍스트를 반환
+                full_text = text_chunk
 
             if not full_text:
                 raise ValueError("생성된 출력이 없습니다.")
