@@ -147,7 +147,6 @@ class PromptTemplates:
     - Write only the plain Korean answer.
     - No headings, notes, or explanations.
     - No formatting or special tokens.
-    - No line breaks. One clean paragraph.
 
     answer:
     """
