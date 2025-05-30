@@ -8,7 +8,6 @@ class PromptTemplates:
 
     - Level: {level}
     - User TIL: {til}
-    - Reference documents: {retrieved}
 
     ## Output Instructions (strict):
     - Your response must be a **single complete sentence** in **Korean**.
@@ -42,7 +41,6 @@ class PromptTemplates:
 
     - Level: {level}
     - User TIL: {til}
-    - Reference documents: {retrieved}
 
     ## Output Instructions (strict):
     - Your response must be a **single complete sentence** in **Korean**.
@@ -76,7 +74,6 @@ class PromptTemplates:
 
     - Level: {level}
     - User TIL: {til}
-    - Reference documents: {retrieved}
 
     ## Output Instructions (strict):
     - Your response must be a **single complete sentence** in **Korean**.
