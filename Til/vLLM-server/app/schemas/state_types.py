@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Annotated, Union
+from enum import Enum
 
 
 def merge_dicts(x: dict, y: dict) -> dict:
@@ -15,6 +16,22 @@ def merge_patch_summary_lists(x: list, y: list) -> list:
     if y is None:
         return x
     return x + y
+
+class keywords(str, Enum):
+    keyword1 = "keyword1"
+    keyword2 = "keyword2"
+    keyword3 = "keyword3"
+    keyword4 = "keyword4"
+    keyword5 = "keyword5"
+    keyword6 = "keyword6"
+    keyword7 = "keyword7"
+    keyword8 = "keyword8"
+    keyword9 = "keyword9"
+    keyword10 = "keyword10"
+
+
+class TILKeywordsModel(BaseModel):
+    keywords_list: List[str] = []
 
 
 class PatchModel(BaseModel):
@@ -38,7 +55,7 @@ class TilJsonModel(BaseModel):
     username: str
     date: str
     repo: str
-    keywords: Union[str, List[str]] #List[str]
+    keywords: TILKeywordsModel
     content: str
     vector: List[float]
 

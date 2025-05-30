@@ -2,47 +2,18 @@ import os
 import uuid
 import re
 from app.prompts.Prompts import LanggraphPrompts
-from app.schemas.state_types import TilJsonModel, StateModel, PatchSummaryModel
+from app.schemas.state_types import TilJsonModel, StateModel, PatchSummaryModel, TILKeywordsModel
 from app.models.model import TILModels
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from langsmith import traceable
 from langgraph.graph import StateGraph
-from vllm import SamplingParams
+from pydantic import ValidationError
 import logging
 import ast
 
 logger = logging.getLogger(__name__)
 
-# 커밋 이력 데이터 
-def extract_before_after(diff_lines):
-    before_lines = []
-    after_lines = []
-    for line in diff_lines:
-        if line.startswith('-') and not line.startswith('---'):
-            before_lines.append(line[1:].strip())
-        elif line.startswith('+') and not line.startswith('+++'):
-            after_lines.append(line[1:].strip())
-    return before_lines, after_lines
-
-# 특수 문제 전처리 함수(제목, 키워드)
-def clean_llm_output(output: str) -> str:
-    # 코드 블록 제거 (```로 감싼 블록)
-    output = re.sub(r"```.*?```", "", output, flags=re.DOTALL)
-    # 코드 블록 시작/종료 따로도 제거 (단독 줄 또는 끝에 오는 것 포함)
-    output = re.sub(r"```", "", output)
-    # 마크다운 구분선/헤더 제거
-    output = re.sub(r"^---+", "", output, flags=re.MULTILINE)
-    output = re.sub(r"^#+ .*", "", output, flags=re.MULTILINE)
-    output = output.replace("```", "").replace("'''", "")
-    # "답변:", "제목:" 등 앞 단어 제거
-    output = re.sub(r"(?i)^.*?[:：]", "", output, count=1)
-    # 슬래시(/) 제거 또는 대체
-    output = output.replace("/", " ")  # 또는 .replace("/", "") if 공백도 싫다면
-    output = output.replace("\\", " ")  # 또는 .replace("/", "") if 공백도 싫다면
-    # 줄바꿈 → 공백
-    output = output.replace("\n", " ")
-    return output.strip()
 
 class Langgraph:
     def __init__(self, files_num, model: TILModels):
@@ -90,19 +61,19 @@ class Langgraph:
     def make_code_summary_node(self, node_id: int):
         @traceable(run_type="llm")
         async def code_summary_node(state: StateModel) -> dict:
-            params = SamplingParams(
-            temperature=0.3,
-            top_p=0.7,
-            max_tokens=512,
-            repetition_penalty = 1.1,
-            stop=["<eos>", "<pad>", "```", "<```>"],
-            stop_token_ids = [12234, 2, 7243, 2717]
-            )
+            params = {
+                "temperature": 0.3,
+                "top_p": 0.95,
+                "max_tokens": 1024,
+                "repetition_penalty": 1.1,
+                "stop": ["<eos>", "<pad>", "```", "<```>"],
+                "stop_token_ids": [12234, 2, 7243, 2717]
+            }
 
             file = next(file for file in state.files if file.node_id == node_id)
 
             prompt = self.prompts.make_code_summary_prompt(file)
-            summary = await self.model.generate_til(prompt, params)
+            summary = await self.model.generate(prompt, params)
 
             return {"code_summary": {f"code_summary_{node_id}": summary}}
         return code_summary_node
@@ -110,15 +81,14 @@ class Langgraph:
     def make_patch_summary_node(self, node_id: int):
         @traceable(run_type="llm")
         async def patch_summary_node(state: StateModel) -> dict:
-            params = SamplingParams(
-            temperature=0.3,
-            top_p=0.7,
-
-            max_tokens=512,
-            repetition_penalty = 1.1,
-            stop=["<eos>", "<pad>", "```", "<```>"],
-            stop_token_ids = [12234, 2, 7243, 2717]
-            )
+            params = {
+                "temperature": 0.3,
+                "top_p": 0.95,
+                "max_tokens": 512,
+                "repetition_penalty": 1.1,
+                "stop": ["<eos>", "<pad>", "```", "<```>"],
+                "stop_token_ids": [12234, 2, 7243, 2717]
+            }
 
             files = state.files
             file_entry = next(file for file in files if file.node_id == node_id)
@@ -152,7 +122,7 @@ class Langgraph:
             code_summary = code_summaries.get(f"code_summary_{node_id}", "")
 
             prompt = self.prompts.make_patch_summary_prompt(code_summary, latest_patch["commit_message"], latest_patch["before_code"], latest_patch["after_code"])
-            summary = await self.model.generate_til(prompt, params)
+            summary = await self.model.generate(prompt, params)
 
             return {"patch_summary": 
                     [PatchSummaryModel(
@@ -164,21 +134,22 @@ class Langgraph:
 
     @traceable
     async def til_draft_node(self, state: StateModel) -> dict:
-        params = SamplingParams(
-        temperature=0.3,
-        top_p=0.7,
-        # top_k=20,
-        max_tokens=2048,
-        repetition_penalty = 1.2,
-        stop=["<eos>", "<pad>", "```", "<```>"],
-        stop_token_ids = [12234, 2, 7243, 2717]
-        )
+
+
+        params = {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "max_tokens": 2024,
+            "repetition_penalty": 1.1,
+            "stop": ["<eos>", "<pad>", "```", "<```>"],
+            "stop_token_ids": [12234, 2, 7243, 2717]
+        }
         username = state.username
         date = state.date
         repo = state.repo
         patch_summaries = state.patch_summary
         prompt = self.prompts.til_draft_prompt(username, date, repo, patch_summaries)
-        draft_json_str = await self.model.generate_til(prompt, params)
+        draft_json_str = await self.model.generate(prompt, params)
         # Til 끝에 ''' 제거
         draft_json_str = draft_json_str.replace("```", "").replace("'''", "")
 
@@ -186,7 +157,7 @@ class Langgraph:
         username=username,
         date=date,
         repo=repo,
-        keywords="",
+        keywords=TILKeywordsModel(keywords_list=[]),
         content=draft_json_str,
         vector=[])
 
@@ -194,37 +165,39 @@ class Langgraph:
         
     @traceable
     async def til_keywords_node(self, state: StateModel) -> dict:
-        params = SamplingParams(
-            temperature=0.3,
-            top_p=0.9,
-            max_tokens=32,
-            repetition_penalty= 1.2,
-            stop=["<eos>", "<pad>", "```", "<```>"],
-            stop_token_ids = [12234, 2, 7243, 2717]
-        )
+        json_schema = TILKeywordsModel.model_json_schema()
+        extra_body={"guided_json": json_schema}
+        params = {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "max_tokens": 256,
+            "repetition_penalty": 1.1,
+            "stop": ["<eos>", "<pad>", "```", "<```>"],
+            "stop_token_ids": [12234, 2, 7243, 2717],
+        }
 
         content = state.til_json.content
         prompt = LanggraphPrompts.til_keywords_prompt(content)
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
-            keywords_output = await self.model.generate_til(prompt, params)
-            keywords_output = clean_llm_output(keywords_output)
-
             try:
-                parsed = ast.literal_eval(keywords_output)
-                if isinstance(parsed, list) and all(isinstance(k, str) for k in parsed):
-                    state.til_json.keywords = parsed[:3]
-                    break  # 파싱 성공
-                else:
-                    raise ValueError("응답이 리스트 형식이 아님")
-            except Exception as e:
-                logging.warning(f"[til_keywords_node] 키워드 파싱 실패 (시도 {attempt}/{max_attempts}): {e}")
+                keywords_output = await self.model.generate(prompt, params, extra_body)
+                print("[🧪 Raw output]", keywords_output)
+
+                # pydantic 기반 파싱 시도
+                parsed = TILKeywordsModel.parse_raw(keywords_output)
+
+                # 최대 3개까지만 반영
+                trimmed_keywords = parsed.keywords_list[:3]
+                state.til_json.keywords = TILKeywordsModel(keywords_list=trimmed_keywords)
+                break
+
+            except ValidationError as e:
+                logging.warning(f"[til_keywords_node] JSON 파싱 실패 (시도 {attempt}/{max_attempts}): {e}")
                 if attempt == max_attempts:
                     logging.error("[til_keywords_node] 키워드 파싱 3회 실패, 원본 문자열 저장")
-                    state.til_json.keywords = keywords_output.strip()
-
-        return {"til_json": state.til_json}
+                    state.til_json.keywords = TILKeywordsModel(keywords_list=[keywords_output.strip()])
 
     @traceable
     async def embed_and_store_in_qdrant_node(self, state: StateModel) -> dict:
