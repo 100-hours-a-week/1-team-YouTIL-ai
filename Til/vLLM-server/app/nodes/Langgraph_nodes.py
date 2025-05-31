@@ -1,9 +1,9 @@
 import os
 import uuid
-import re
 from app.prompts.Prompts import LanggraphPrompts
 from app.schemas.state_types import TilJsonModel, StateModel, PatchSummaryModel, TILKeywordsModel
-from app.models.model import TILModels
+from app.models.model import TILModel
+from app.models.embedding import EmbeddingModel
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from langsmith import traceable
@@ -14,11 +14,23 @@ import ast
 
 logger = logging.getLogger(__name__)
 
+# 커밋 이력 데이터 
+def extract_before_after(diff_lines):
+    before_lines = []
+    after_lines = []
+    for line in diff_lines:
+        if line.startswith('-') and not line.startswith('---'):
+            before_lines.append(line[1:].strip())
+        elif line.startswith('+') and not line.startswith('+++'):
+            after_lines.append(line[1:].strip())
+    return before_lines, after_lines
+
 
 class Langgraph:
-    def __init__(self, files_num, model: TILModels):
+    def __init__(self, files_num, model: TILModel, embedding: EmbeddingModel):
         self.prompts = LanggraphPrompts()
         self.model = model
+        self.embedding = embedding
         self.client = QdrantClient(host=os.getenv("DB_SERVER_IP"), port=6333)
         self.files_num = files_num
         self.graph = self._build_graph()
@@ -47,7 +59,12 @@ class Langgraph:
         builder.set_finish_point("embedding_til_node")
         return builder.compile()
 
-    @traceable
+    @traceable(
+            name="fork_commit_node",
+            run_type="tool",
+            tags=["fork_node"],
+            metadata={"component":"fork_commit","version":"v2",} 
+               )
     def fork_code_nodes(self, state: StateModel) -> StateModel:
         return state.model_copy(
             update={
@@ -59,7 +76,12 @@ class Langgraph:
         )
 
     def make_code_summary_node(self, node_id: int):
-        @traceable(run_type="llm")
+        @traceable(
+            name="generate_code_summary_node",
+            run_type="llm",
+            tags=["code"],
+            metadata={"component":"code_summary","version":"v2",} 
+               )
         async def code_summary_node(state: StateModel) -> dict:
             params = {
                 "temperature": 0.3,
@@ -79,7 +101,12 @@ class Langgraph:
         return code_summary_node
 
     def make_patch_summary_node(self, node_id: int):
-        @traceable(run_type="llm")
+        @traceable(
+            name="generate_patches_summary_node",
+            run_type="llm",
+            tags=["patches"],
+            metadata={"component":"patches_summary","version":"v2",} 
+               )
         async def patch_summary_node(state: StateModel) -> dict:
             params = {
                 "temperature": 0.3,
@@ -132,7 +159,12 @@ class Langgraph:
 
         return patch_summary_node
 
-    @traceable
+    @traceable(
+            name="generate_til_node",
+            run_type="llm",
+            tags=["til"],
+            metadata={"component":"generate_til","version":"v2",} 
+               )
     async def til_draft_node(self, state: StateModel) -> dict:
 
 
@@ -163,7 +195,12 @@ class Langgraph:
 
         return {"til_json": parsed}
         
-    @traceable
+    @traceable(
+            name="keywords_from_til_node",
+            run_type="llm",
+            tags=["keywords"],
+            metadata={"component":"keyowrds_from_til","version":"v2",} 
+               )
     async def til_keywords_node(self, state: StateModel) -> dict:
         json_schema = TILKeywordsModel.model_json_schema()
         extra_body={"guided_json": json_schema}
@@ -209,7 +246,7 @@ class Langgraph:
         text = f"query: {content}"
 
         try:
-            embedding = await self.model.get_embedding(text)
+            embedding = await self.embedding.get_embedding(text)
             payload = {k: v for k, v in til_json.model_dump().items() if k != "vector"}
 
             point = PointStruct(
