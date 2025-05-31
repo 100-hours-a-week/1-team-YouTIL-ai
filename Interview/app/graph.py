@@ -19,27 +19,6 @@ class QAFlow:
 
     def embed_text(self, text: str) -> list[float]:
         return self.embedding_model.encode(text).tolist()
-
-    async def retriever_node(self, state: QAState) -> dict:
-        query = state.til
-        query_vector = self.embed_text(query)
-
-        #category = state.category
-
-        results = self.qdrant.search(
-            collection_name="knowledge_all",
-            query_vector=query_vector,
-            limit=3,
-            with_payload=True
-        )
-
-        retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
-        best_score = results[0].score if results else 0.0
-
-        return {
-            "similarity_score": best_score,
-            "retrieved_texts": retrieved_texts
-        }
     
     def clean_korean_question(self, text: str) -> str:
 
@@ -66,12 +45,9 @@ class QAFlow:
     def generate_question_node(self, node_id: int):
         @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")
         async def question_node(state: QAState) -> dict:
-            retrieved = "\n\n".join(state.retrieved_texts or [])
-            
             prompt1 = getattr(self.templates, f"question{node_id}_prompt").format(
                 til=state.til,
                 level=state.level,
-                retrieved=retrieved
             )
 
             sampling_params = SamplingParams(
@@ -95,6 +71,30 @@ class QAFlow:
             return {f"question{node_id}": cleaned_question}
 
         return question_node
+    
+    def generate_retriever_node(self, node_id: int):
+        @traceable(name=f"검색 노드 {node_id}", run_type="retriever")
+        async def retriever_node(state: QAState) -> dict:
+            question = getattr(state, f"question{node_id}", "")
+            query = f"{state.til}\n{question}"
+            query_vector = self.embed_text(query)
+
+            results = self.qdrant.search(
+                collection_name="knowledge_all",
+                query_vector=query_vector,
+                limit=1,
+                with_payload=True
+            )
+
+            retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
+            best_score = results[0].score if results else 0.0
+
+            return {
+                f"similarity_score{node_id}": best_score,
+                f"retrieved_texts{node_id}": retrieved_texts
+            }
+        
+        return retriever_node
 
     def generate_answer_node(self, node_id: int):
         @traceable(name=f"답변 생성 노드 {node_id}", run_type="llm")
@@ -108,9 +108,9 @@ class QAFlow:
                             answer="[답변 생성 실패]"
                         )
                     }
-                #raise ValueError(f"질문 {node_id}가 없습니다.")
 
-            context = "\n\n".join(state.retrieved_texts or [])
+            context = getattr(state, f"retrieved_texts{node_id}", None)
+            context = "\n\n".join(context) if context else ""
 
             prompt2 = getattr(self.templates, f"answer{node_id}_prompt").format(
                 question=question,
@@ -183,18 +183,25 @@ class QAFlow:
 
     def build_graph(self):
         workflow = StateGraph(QAState)
-        workflow.set_entry_point("retriever")
-        workflow.add_node("retriever", self.retriever_node)
+
+        async def start_node(state: QAState) -> dict:
+            return {}
+        
+        workflow.add_node("start", start_node)
+        workflow.set_entry_point("start")
 
         for i in range(3):
             workflow.add_node(f"que{i}", self.generate_question_node(i))
+            workflow.add_node(f"retriever{i}", self.generate_retriever_node(i))
             workflow.add_node(f"ans{i}", self.generate_answer_node(i))
 
-            workflow.add_edge("retriever", f"que{i}")
-            workflow.add_edge(f"que{i}", f"ans{i}")
+            workflow.add_edge("start", f"que{i}")
+            workflow.add_edge(f"que{i}", f"retriever{i}")
+            workflow.add_edge(f"retriever{i}", f"ans{i}")
             workflow.add_edge(f"ans{i}", "summary_generate")
 
         workflow.add_node("summary_generate", self.summary_node)
         workflow.set_finish_point("summary_generate")
 
         return workflow.compile()
+    
