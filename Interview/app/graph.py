@@ -189,7 +189,7 @@ class QAFlow:
         
         workflow.add_node("start", start_node)
         workflow.set_entry_point("start")
-
+        
         for i in range(3):
             workflow.add_node(f"que{i}", self.generate_question_node(i))
             workflow.add_node(f"retriever{i}", self.generate_retriever_node(i))
@@ -198,7 +198,7 @@ class QAFlow:
             workflow.add_edge("start", f"que{i}")
             workflow.add_edge(f"que{i}", f"retriever{i}")
             workflow.add_edge(f"retriever{i}", f"ans{i}")
-            workflow.add_edge(f"ans{i}", "summary_generate")
+            workflow.add_edge(f"ans{i}", f"summary_generate")
 
         workflow.add_node("summary_generate", self.summary_node)
         workflow.set_finish_point("summary_generate")
