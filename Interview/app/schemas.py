@@ -34,3 +34,4 @@ class QAState(BaseModel):
 
     content: Optional[List[ContentState]] = None
     summary: Optional[str] = None
+
