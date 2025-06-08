@@ -4,10 +4,6 @@ from typing import List, Optional
 class ContentState(BaseModel):
     question: str
     answer: str 
-    answer_markdown: str = ""
-
-class FormattedOutput(BaseModel):
-    markdown_output: str
 
 class QAState(BaseModel):
     email: str
