@@ -13,5 +13,5 @@ class EvaluationResult(Base):
     rouge_score = Column(Float)
     bert_score = Column(Float)
     recall_at_k = Column(Float)
-    avg_similarity_score = Column(Float)
+    similarity_score = Column(Float)
     created_at = Column(TIMESTAMP, server_default=func.now())
