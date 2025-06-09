@@ -66,7 +66,18 @@ class QAFlow:
             ):
                 final_text = output.outputs[0].text.strip()
 
+            async for output in self.llm.generate(
+                prompt=prompt1,
+                sampling_params=sampling_params,
+                request_id=request_id
+            ):
+                final_text = output.outputs[0].text.strip()
+
+            #logger.debug(f"[질문{node_id}] LLM 원본 응답:\n{final_text}")
+
             cleaned_question = self.clean_korean_question(final_text)
+            
+            #logger.debug(f"[질문{node_id}] 정제 질문:\n{cleaned_question}")
 
             return {f"question{node_id}": cleaned_question}
 
@@ -87,10 +98,19 @@ class QAFlow:
             )
 
             retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
+
+            is_relevant = any(state.til.strip() in text for text in retrieved_texts)
+            recall_at_k = 1.0 if is_relevant else 0.0
+
             best_score = results[0].score if results else 0.0
+
+            # logger.debug(f"[검색{node_id}] 질문: {question}")
+            # logger.debug(f"[검색{node_id}] 검색결과 수: {len(retrieved_texts)}")
+            # logger.debug(f"[검색{node_id}] recall@k: {recall_at_k}, similarity: {best_score}")
 
             return {
                 f"similarity_score{node_id}": best_score,
+                f"recall_at_k{node_id}": recall_at_k,
                 f"retrieved_texts{node_id}": retrieved_texts
             }
         
