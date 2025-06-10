@@ -145,6 +145,18 @@ class QAFlow:
 
         return answer_node
 
+    def is_invalid_summary(self, text: str) -> bool:
+        text = text.strip()
+        if not text or len(text)>30:
+            return True
+        if text in ["###", "Q:", "제목 없음"]:
+            return True
+        if text.lower().startswith("q:") or text.lower().startswith("a:"):
+            return True
+        if text in ["###", "제목:", "제목 없음"]:
+            return True
+        return False
+
     @traceable(name="요약 생성 노드", run_type="llm")
     async def summary_node(self, state: QAState) -> dict:
         merged = []
@@ -161,25 +173,44 @@ class QAFlow:
             qacombined = qacombined
         )
 
-        try:
-            final_text = await model.generate(
-                prompt=prompt3,
-                max_tokens=32,
-                temperature=0.3
-            )
+        last_valid = None
 
-            final_text = self.delete_blank(final_text)
+        for attempt in range(3):
+            try:
+                final_text = await model.generate(
+                    prompt=prompt3,
+                    max_tokens=32,
+                    temperature=0.3
+                )
 
-            return {
-                "summary": final_text,
-                "content": merged
-            }
-        except Exception as e:
-            logger.error(f"요약 생성 실패: {e}")
-            return {
-                "summary": "[요약 실패]",
-                "content": merged
-            }
+                final_text = self.delete_blank(final_text).strip()
+
+                if not final_text or final_text in ["###", "[요약 실패]"]:
+                    logger.warning(f"요약 시도 {attempt+1} 실패한 출력: {final_text}")
+                    continue
+
+                if not self.is_invalid_summary(final_text):
+                    return {
+                        "summary": final_text,
+                        "content": merged
+                    }
+
+                last_valid = final_text
+
+                return {
+                    "summary": final_text,
+                    "content": merged
+                }
+            except Exception as e:
+                logger.warning(f"요약 시도 {attempt+1} 실패: {e}")
+                continue
+        
+        logger.error("요약 생성 3회 실패")
+        return {
+            "summary": last_valid or "[요약 실패]",
+            "content": merged
+        }
+        
 
     def build_graph(self):
         workflow = StateGraph(QAState)

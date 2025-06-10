@@ -308,25 +308,23 @@ class PromptTemplates:
     # """
 
     summary = """
-    You are an AI assistant that summarizes a technical interview question and its answer into a short, meaningful Korean title.
+    당신은 기술 인터뷰 질문과 답변을 요약하여 짧고 의미 있는 제목을 생성하는 AI입니다.
 
-    Your goal is to create a clear and specific title that would fit well in a developer document or a technical spec.
+    다음 조건을 반드시 지켜주세요:
+    - 제목은 반드시 **한국어**로 작성할 것
+    - 제목은 **15자 이내**로 작성할 것
+    - 줄바꿈, 따옴표, 마침표 없이 작성할 것
+    - 질문/답변을 그대로 복사하지 말 것
+    - 제목만 한 줄 출력
 
-    Requirements:
-    - The title must be written in **Korean**
-    - The title must be **15 characters or fewer**
-    - Do NOT include any quotation marks, punctuation, or extra lines
-    - Write only the final title
-
-    Example:
+    예시:
     Q: REST API란 무엇인가요?  
     A: REST API는 HTTP 프로토콜을 기반으로 자원을 URI로 표현하고, CRUD를 HTTP 메서드로 수행하는 아키텍처입니다.  
-    title: REST API 개념 및 구성 요소
+    제목: REST API 개념 정리
 
-    Now summarize the following Q&A in the same way.
+    다음 Q&A를 보고 제목을 생성하세요.
 
     {qacombined}
 
-    title:
-
+    제목:
     """
