@@ -1,8 +1,6 @@
 from tenacity import retry, stop_after_attempt, wait_fixed
 from langgraph.graph import StateGraph
 from langsmith import traceable
-from uuid import uuid4
-from vllm import SamplingParams
 from schemas import QAState, ContentState
 from model import model
 import logging
@@ -24,20 +22,16 @@ class QAFlow:
 
         text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
 
-        # 라벨 및 마크다운 제거
         text = re.sub(r'\*\*?(Question|Answer|Note|Level).*?\*\*?', '', text, flags=re.IGNORECASE)
         text = re.sub(r'(Question|Answer|Level)\s*[:：]*', '', text, flags=re.IGNORECASE)
         text = re.sub(r'^#+\s*', '', text)
 
-        # 문장 맨 앞 하이픈/번호 제거
         text = re.sub(r'^[-•\s]+\d*\s*', '', text)
 
-        # 기타 특수문자 제거
         text = text.replace("`", "").replace("“", "").replace("”", "")
         text = text.replace("👉", "").replace("→", "").strip()
         text = text.strip().strip('"“”')
 
-        # 줄 단위로 나누기
         lines = [line.strip() for line in text.split('\n') if line.strip()]
 
         return lines[0] if lines else ""
@@ -50,36 +44,19 @@ class QAFlow:
                 level=state.level,
             )
 
-            sampling_params = SamplingParams(
-                temperature=0.7,
-                max_tokens=128,
-                stop_token_ids=[2]
-            )
+            try:
+                final_text = await model.generate(
+                    prompt=prompt1,
+                    max_tokens=128,
+                    temperature=0.7
+                )
 
-            request_id = str(uuid4())
-            final_text = ""
-
-            async for output in self.llm.generate(
-                prompt=prompt1,
-                sampling_params=sampling_params,
-                request_id=request_id
-            ):
-                final_text = output.outputs[0].text.strip()
-
-            async for output in self.llm.generate(
-                prompt=prompt1,
-                sampling_params=sampling_params,
-                request_id=request_id
-            ):
-                final_text = output.outputs[0].text.strip()
-
-            #logger.debug(f"[질문{node_id}] LLM 원본 응답:\n{final_text}")
-
-            cleaned_question = self.clean_korean_question(final_text)
+                cleaned_question = self.clean_korean_question(final_text)
+                return {f"question{node_id}": cleaned_question}
             
-            #logger.debug(f"[질문{node_id}] 정제 질문:\n{cleaned_question}")
-
-            return {f"question{node_id}": cleaned_question}
+            except Exception as e:
+                logger.error(f"질문 생성 실패: {e}")
+                return {f"question{node_id}": ""}
 
         return question_node
     
@@ -98,23 +75,25 @@ class QAFlow:
             )
 
             retrieved_texts = [r.payload["text"] for r in results if "text" in r.payload]
-
-            is_relevant = any(state.til.strip() in text for text in retrieved_texts)
-            recall_at_k = 1.0 if is_relevant else 0.0
-
             best_score = results[0].score if results else 0.0
-
-            # logger.debug(f"[검색{node_id}] 질문: {question}")
-            # logger.debug(f"[검색{node_id}] 검색결과 수: {len(retrieved_texts)}")
-            # logger.debug(f"[검색{node_id}] recall@k: {recall_at_k}, similarity: {best_score}")
 
             return {
                 f"similarity_score{node_id}": best_score,
-                f"recall_at_k{node_id}": recall_at_k,
                 f"retrieved_texts{node_id}": retrieved_texts
             }
         
         return retriever_node
+
+    def delete_blank(self, text: str) -> str:
+        text = re.sub(r"(?<!\n)\n(###)", r"\n\n\1", text)
+
+        lines = text.splitlines()
+        cleaned_lines = [
+            line if line.startswith("###") or line.strip() == "" else line.lstrip()
+            for line in lines
+        ]
+
+        return "\n".join(cleaned_lines)
 
     def generate_answer_node(self, node_id: int):
         @traceable(name=f"답변 생성 노드 {node_id}", run_type="llm")
@@ -139,28 +118,30 @@ class QAFlow:
                 context=context
             )
 
-            sampling_params = SamplingParams(
-                temperature=0.7,
-                max_tokens=512,
-                stop_token_ids=[2]
-            )
-
-            request_id = str(uuid4())
-            final_text = ""
-
-            async for output in self.llm.generate(
-                prompt=prompt2,
-                sampling_params=sampling_params,
-                request_id=request_id
-            ):
-                final_text = output.outputs[0].text.strip()
-
-            return {
-                f"content{node_id}": ContentState(
-                    question=question,
-                    answer=final_text
+            try:
+                final_text = await model.generate(
+                    prompt=prompt2,
+                    max_tokens=512,
+                    temperature=0.7
                 )
-            }
+
+                final_text = self.delete_blank(final_text)
+                
+                return {
+                    f"content{node_id}":ContentState(
+                        question=question,
+                        answer=final_text
+                    )
+                }
+            
+            except Exception as e:
+                logger.error(f"답변 생성 실패: {e}")
+                return {
+                    f"content{node_id}":ContentState(
+                        question=question,
+                        answer="답변 생성 실패"
+                    )
+                }
 
         return answer_node
 
@@ -180,26 +161,25 @@ class QAFlow:
             qacombined = qacombined
         )
 
-        sampling_params = SamplingParams(
-            temperature=0.3,
-            max_tokens=32,
-            stop_token_ids=[2]
-        )
+        try:
+            final_text = await model.generate(
+                prompt=prompt3,
+                max_tokens=32,
+                temperature=0.3
+            )
 
-        request_id = str(uuid4())
-        final_text = ""
+            final_text = self.delete_blank(final_text)
 
-        async for output in self.llm.generate(
-            prompt=prompt3,
-            sampling_params=sampling_params,
-            request_id=request_id
-        ):
-            final_text = output.outputs[0].text.strip()
-
-        return {
-            "summary": final_text,
-            "content": merged
-        }
+            return {
+                "summary": final_text,
+                "content": merged
+            }
+        except Exception as e:
+            logger.error(f"요약 생성 실패: {e}")
+            return {
+                "summary": "[요약 실패]",
+                "content": merged
+            }
 
     def build_graph(self):
         workflow = StateGraph(QAState)
@@ -209,7 +189,7 @@ class QAFlow:
         
         workflow.add_node("start", start_node)
         workflow.set_entry_point("start")
-        
+
         for i in range(3):
             workflow.add_node(f"que{i}", self.generate_question_node(i))
             workflow.add_node(f"retriever{i}", self.generate_retriever_node(i))
@@ -218,10 +198,9 @@ class QAFlow:
             workflow.add_edge("start", f"que{i}")
             workflow.add_edge(f"que{i}", f"retriever{i}")
             workflow.add_edge(f"retriever{i}", f"ans{i}")
-            workflow.add_edge(f"ans{i}", f"summary_generate")
+            workflow.add_edge(f"ans{i}", "summary_generate")
 
         workflow.add_node("summary_generate", self.summary_node)
         workflow.set_finish_point("summary_generate")
 
         return workflow.compile()
-    
