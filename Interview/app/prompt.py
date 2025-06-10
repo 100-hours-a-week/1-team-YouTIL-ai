@@ -174,10 +174,7 @@ class PromptTemplates:
     ### 🔚 결론  
     (실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    ---
-
     답변:
-
     """
 
     # answer0_prompt = """
@@ -241,8 +238,6 @@ class PromptTemplates:
     ### 🔚 결론  
     (실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    ---
-
     답변:
     """ 
 
@@ -278,10 +273,7 @@ class PromptTemplates:
     ### 🔚 결론  
     (실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    ---
-
     답변:
-
     """
 
     # format_prompt = """

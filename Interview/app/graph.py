@@ -48,7 +48,7 @@ class QAFlow:
                 final_text = await model.generate(
                     prompt=prompt1,
                     max_tokens=128,
-                    temperature=0.7
+                    temperature=0.5
                 )
 
                 cleaned_question = self.clean_korean_question(final_text)
@@ -122,7 +122,8 @@ class QAFlow:
                 final_text = await model.generate(
                     prompt=prompt2,
                     max_tokens=512,
-                    temperature=0.7
+                    temperature=0.3,
+                    stop=["---"]
                 )
 
                 final_text = self.delete_blank(final_text)

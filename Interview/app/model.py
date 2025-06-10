@@ -41,7 +41,8 @@ class InterviewModels:
     async def generate(self, 
                        prompt: str, 
                        max_tokens: int = 512,
-                       temperature: float = 0.7) -> str:
+                       temperature: float = 0.3,
+                       stop: list = None) -> str:
         try:
             response = await self.llm.completions.create(
                 model="google/gemma-3-4b-it",
