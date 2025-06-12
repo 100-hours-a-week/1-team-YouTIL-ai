@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from app.schemas.state_types import StateModel
 from app.models import get_til_model
+from app.models import EmbeddingModel
 from app.nodes.Langgraph_nodes import Langgraph
 from app.evaluation.evaluate import TilEvaluator
 from app.utils.discord_client import DiscordClient
@@ -15,6 +16,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 router = APIRouter()
 model = get_til_model()
+embedding_model = EmbeddingModel()
 discord_client = DiscordClient()
 
 # 비동기 Discord 클라이언트 실행
@@ -50,16 +52,17 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
 async def process_til(data: StateModel, background_tasks: BackgroundTasks):
     try:
         files_num = len(data.files)
-        graph = Langgraph(files_num=files_num, model=model)
+        graph = Langgraph(files_num=files_num, model=model, embedding=embedding_model)
         result = await graph.graph.ainvoke(data)
         til_json = result["til_json"]
         til_json_dict = til_json.dict(exclude={"vector"})
 
+        # 디스코드 팀 채널에 til 결과 전달
         await discord_client.send_til_to_thread(
             content=til_json_dict["content"],
             username=til_json_dict["username"]
         )
-
+        # MySQL DB에 전달할 사용자 정보
         metadata = {
             "username": til_json_dict["username"],
             "commit_date": til_json_dict["date"],
@@ -67,6 +70,7 @@ async def process_til(data: StateModel, background_tasks: BackgroundTasks):
             "content": til_json_dict["content"]
         }
 
+        # evaluation 과정은 backgroun에서 수행해 til 생성시 클라이언트에게 바로 전달
         background_tasks.add_task(evaluate_and_save_mysql, til_json_dict["content"], metadata, connection_info)
         return til_json_dict
 
