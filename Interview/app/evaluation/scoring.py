@@ -5,7 +5,9 @@ from typing import Optional
 # import nltk
 # nltk.download('punkt')
 
-def compute_scores(reference: str, prediction: str, similarity_score: Optional[float] = None) -> dict:
+def compute_scores(reference: str, prediction: str, 
+                   similarity_score: Optional[float] = None,
+                   recall_at_k: Optional[float] = None) -> dict:
     # BLEU
     bleu = evaluate.load("bleu")
     bleu_score = bleu.compute(predictions=[prediction], references=[[reference]])["bleu"]
@@ -15,12 +17,13 @@ def compute_scores(reference: str, prediction: str, similarity_score: Optional[f
     rouge_score = rouge.compute(predictions=[prediction], references=[reference])["rougeL"]
 
     # BERTScore
-    P, R, F1 = bert_score([prediction], [reference], lang="ko")
+    P, R, F1 = bert_score([prediction], [reference], lang="ko", device="cpu")
     bert_score_f1 = F1[0].item()
-    
+
     return {
         "bleu_score": bleu_score,
         "rouge_score": rouge_score,
         "bert_score": bert_score_f1,
-        "avg_similarity_score": similarity_score
+        "similarity_score": similarity_score,
+        "recall_at_k": recall_at_k
     }

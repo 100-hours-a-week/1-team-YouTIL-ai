@@ -25,6 +25,10 @@ class QAState(BaseModel):
     similarity_score1: Optional[float] = None
     similarity_score2: Optional[float] = None
 
+    recall_at_k0: Optional[float] = None
+    recall_at_k1: Optional[float] = None
+    recall_at_k2: Optional[float] = None
+
     content0: Optional[ContentState] = None
     content1: Optional[ContentState] = None
     content2: Optional[ContentState] = None

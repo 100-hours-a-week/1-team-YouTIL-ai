@@ -1,22 +1,22 @@
 from evaluation.scoring import compute_scores
 from evaluation.store import store_to_db
-
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
 import traceback
-
 from model import model
 from prompt import PromptTemplates
 from graph import QAFlow
 from schemas import QAState, ContentState
-
 import requests
+import logging
 
 qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
 
 app = FastAPI(debug=True)
+
+#logging.basicConfig(level=logging.DEBUG)
 
 @app.post("/interview")
 async def generate(data: QAState):
@@ -29,12 +29,15 @@ async def generate(data: QAState):
             question = item.question
             answer = item.answer
 
-            similarity_score = getattr(data, f"similarity_score{idx}", None)
+            #similarity_score = getattr(data, f"similarity_score{idx}", None)
+            similarity_score = result.get(f"similarity_score{idx}", None)
+            recall = result.get(f"recall_at_k{idx}", None)
 
             scores = compute_scores(
                 reference=data.til, 
                 prediction=answer,
-                similarity_score=similarity_score)
+                similarity_score=similarity_score,
+                recall_at_k=recall)
 
             # DB 저장
             store_to_db({
@@ -55,17 +58,6 @@ async def generate(data: QAState):
             "summary": result["summary"],
             "content": formatted_content
         }
-
-        # formatted_content = [
-        #     {"question": item.question, 
-        #      "answer": item.answer}
-        #     for item in result["content"]
-        # ]
-
-        # return {
-        #     "summary": result["summary"],
-        #     "content": formatted_content
-        # }
     
     except Exception as e:
         traceback.print_exc()
