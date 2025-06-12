@@ -1,0 +1,22 @@
+version: "3"
+services:
+  vllm_gemma3_4b:
+    image: vllm/vllm-openai
+    ports:
+      - "8002:8002"
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGINGFACE_TOKEN}
+    # volumes:
+    #   - /home/a01088415234/models/gemma-3-4b-it:/models/gemma
+    command: >
+      --model google/gemma-3-4b-it
+      --port 8002
+      --gpu-memory-utilization 0.95
+      --max-model-len 8192
+      --max-num-seqs 10
+      --max-num-batched-tokens 8192
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
