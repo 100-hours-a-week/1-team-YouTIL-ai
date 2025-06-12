@@ -74,6 +74,10 @@ async def process_til(data: StateModel, background_tasks: BackgroundTasks):
         til_json = result["til_json"]
         til_json_dict = til_json.dict(exclude={"vector"})
 
+        keywords = til_json_dict["keywords"]["keywords_list"]
+
+        til_json_dict["keywords"] = keywords
+
         # 디스코드 팀 채널에 til 결과 전달
         await discord_client.send_til_to_thread(
             content=til_json_dict["content"],

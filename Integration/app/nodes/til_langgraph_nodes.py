@@ -222,10 +222,10 @@ class Langgraph:
                 keywords_output = await self.model.generate(prompt, params, extra_body)
                 print("[🧪 Raw output]", keywords_output)
 
-                # pydantic 기반 파싱 시도
+                # 리스트 추출 및 최대 3개로 자르기
                 parsed = TILKeywordsModel.parse_raw(keywords_output)
-
-                # 최대 3개까지만 반영
+                print(parsed)
+                
                 trimmed_keywords = parsed.keywords_list[:3]
                 state.til_json.keywords = TILKeywordsModel(keywords_list=trimmed_keywords)
                 break
