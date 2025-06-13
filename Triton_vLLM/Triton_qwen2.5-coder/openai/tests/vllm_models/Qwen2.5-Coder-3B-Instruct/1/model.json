@@ -1,0 +1,8 @@
+{
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "disable_log_requests": true,
+  "gpu_memory_utilization": 0.35,
+  "max_model_len": 4096,
+  "max_num_seqs": 8,
+  "max_num_batched_tokens": 4096
+}
