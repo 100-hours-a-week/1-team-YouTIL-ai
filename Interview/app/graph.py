@@ -68,7 +68,7 @@ class QAFlow:
             query_vector = self.embed_text(query)
 
             results = self.qdrant.search(
-                collection_name="knowledge_all",
+                collection_name="tavily_docs",
                 query_vector=query_vector,
                 limit=1,
                 with_payload=True
