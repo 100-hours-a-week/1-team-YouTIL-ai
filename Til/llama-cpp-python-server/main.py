@@ -59,7 +59,40 @@ async def process_til(data: StateModel):
     except Exception as e:
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail=str(e))
+
+from interview_schemas import QAState, ContentState
+from interview_langgraph import QAFlow
+from interview_prompt import PromptTemplates
+
+
+qa_flow = QAFlow(llm=model, templates=PromptTemplates)
+graph = qa_flow.build_graph()
     
+@app.post("/interview")
+async def generate(data: QAState):
+    try:
+        result = await graph.ainvoke(data)
+
+        formatted_content = []
+
+        for idx, item in enumerate(result["content"]):
+            question = item.question
+            answer = item.answer
+
+            # 클라이언트 응답용 리스트 구성
+            formatted_content.append({
+                "question": question,
+                "answer": answer
+            })
+
+        return {
+            "summary": result["summary"],
+            "content": formatted_content
+        }
+    
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 if __name__ == "__main__":
     # allow nested asyncio loop
@@ -71,8 +104,6 @@ if __name__ == "__main__":
     # uvicorn 서버를 백그라운드로 실행
     public_url = ngrok.connect(8000)
     print("🚀 외부 접속 URL:", public_url)
-
-  
 
     # 로컬 서버 실행
     uvicorn.run(app, host="0.0.0.0", port=8000)

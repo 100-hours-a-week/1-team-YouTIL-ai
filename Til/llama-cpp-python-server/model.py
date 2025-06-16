@@ -11,14 +11,14 @@ class LLM:
     def __init__(self):
         self.model = Llama(
             model_path = MISTRAL_7B_Q4KM_PATH,
-            n_gpu_layers=40,
+            n_gpu_layers=100,
             n_batch=128,
             n_ctx=8192
         )
 
         self.translator = Llama(
             model_path= HYPERCLOVAX_SEED_Q4KM_PATH,
-            n_gpu_layers=25,
+            n_gpu_layers=100,
             n_batch=128,
             n_ctx=8192
         )
@@ -43,7 +43,7 @@ class LLM:
             top_p=top_p,
             frequency_penalty=frequency_penalty,
             repeat_penalty=repeat_penalty,
-            stop=stop or [],  # 기본값으로 빈 리스트
+            stop=stop or ["</s>", "---"],  # 기본값으로 빈 리스트
         )
 
         return response["choices"][0]["message"]["content"].strip()
@@ -68,7 +68,31 @@ class LLM:
             top_p=top_p,
             frequency_penalty=frequency_penalty,
             repeat_penalty=repeat_penalty,
-            stop=stop or [],  # 기본값으로 빈 리스트
+            stop=stop or ["</s>", "---"],  # 기본값으로 빈 리스트
         )
 
         return response["choices"][0]["message"]["content"].strip()
+
+    async def question_generate(self, prompt: str) -> str:
+        return await self.generate(
+            prompt=prompt,
+            max_tokens=128,
+            temperature=0.5,
+            stop=["</s>"]
+        )
+
+    async def answer_generate(self, prompt: str) -> str:
+        return await self.generate(
+            prompt=prompt,
+            max_tokens=512,
+            temperature=0.3,
+            stop=["</s>", "---"]
+        )
+
+    async def summary_generate(self, prompt: str) -> str:
+        return await self.generate(
+            prompt=prompt,
+            max_tokens=32,
+            temperature=0.3,
+            stop=["</s>"]
+        )
