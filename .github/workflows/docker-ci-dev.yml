@@ -43,10 +43,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Decode and Save .env
+      - name: Save .env
         working-directory: Integration
         run: |
-          echo "${{ secrets.ENV_DEV }}" | base64 --decode > .env
+          echo "${{ secrets.ENV_DEV }}" > .env
 
       - name: Build Docker Image
         working-directory: Integration
