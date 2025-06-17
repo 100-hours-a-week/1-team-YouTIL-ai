@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # requirements 복사 및 설치 (캐시 최적화)
 COPY requirements.txt .
-RUN  pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+RUN  pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스 코드 복사
