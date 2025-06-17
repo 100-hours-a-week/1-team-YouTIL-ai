@@ -1,0 +1,18 @@
+version: "3"
+services:
+  vllm_qwen2.5_coder:
+    image: vllm/vllm-openai
+    ports:
+      - "8001:8001"
+    command: >
+      --model Qwen/Qwen2.5-Coder-3B-Instruct-GPTQ-Int8
+      --port 8001
+      --gpu-memory-utilization 0.3
+      --max-model-len 4096
+      --max-num-seqs 10
+      --max-num-batched-tokens 4096
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
