@@ -32,6 +32,5 @@ jobs:
 
             docker run -d --name youtil-ai-dev \
               -p 8000:8000 \
-              --env-file /home/ubuntu/Integration/.env \
               ${{ env.IMAGE_TAG }}
           EOF
