@@ -2,82 +2,21 @@ name: AI Docker Scheduling CD
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # KST 15:00
+    - cron: '0 6 * * *'  # 매일 오후 3시 (KST)
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy FastAPI to GCP VM
+    name: Run Deployment Script on GCP VM
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set Image Tag
-        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-ai-dev:latest" >> $GITHUB_ENV
-
       - name: Prepare SSH Key
         run: |
           echo "${{ secrets.YOUTIL_AI_DEV_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Deploy via SSH with Dependency Container
+      - name: Run Remote Deployment Script
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_AI_DEV_HOST }} << 'EOF'
-            set -e
-
-            # 1. 먼저 vllm-openai 컨테이너 실행
-            echo "[1] Starting vllm container..."
-            docker stop integration-vllm_gemma3_4b-1 || true
-            docker rm integration-vllm_gemma3_4b-1 || true
-
-            docker run -d --name integration-vllm_gemma3_4b-1 \
-              -p 8002:8002 \
-              vllm/vllm-openai
-
-            # 2. vllm-openai 컨테이너 헬스 체크
-            echo "[2] Health check for vllm container..."
-            VLLM_MAX_RETRIES=24 # 2분 (24 * 5초)
-            VLLM_RETRY_INTERVAL=5
-            VLLM_RETRIES=0
-
-            until curl -sf http://localhost:8002/health || [ \$VLLM_RETRIES -eq \$VLLM_MAX_RETRIES ]; do
-              echo "vllm health check attempt \$VLLM_RETRIES/\$VLLM_MAX_RETRIES failed. Retrying..."
-              sleep \$VLLM_RETRY_INTERVAL
-              VLLM_RETRIES=\$((VLLM_RETRIES+1))
-            done
-
-            if [ \$VLLM_RETRIES -eq \$VLLM_MAX_RETRIES ]; then
-              echo "❌ vllm health check failed."
-              exit 1
-            else
-              echo "✅ vllm container is healthy."
-            fi
-
-            # 3. youtil-ai-dev 배포
-            echo "[3] Deploying youtil-ai-dev..."
-            docker pull ${{ env.IMAGE_TAG }}
-
-            docker stop youtil-ai-dev || true
-            docker rm youtil-ai-dev || true
-
-            docker run -d --name youtil-ai-dev \
-              -p 8000:8000 \
-              ${{ env.IMAGE_TAG }}
-
-            echo "[4] Health check for youtil-ai-dev..."
-            MAX_RETRIES=12
-            RETRY_INTERVAL=5
-            RETRIES=0
-
-            until curl -sf http://localhost:8000/health || [ \$RETRIES -eq \$MAX_RETRIES ]; do
-              echo "Health check attempt \$RETRIES/\$MAX_RETRIES failed. Retrying..."
-              sleep \$RETRY_INTERVAL
-              RETRIES=\$((RETRIES+1))
-            done
-
-            if [ \$RETRIES -eq \$MAX_RETRIES ]; then
-              echo "❌ youtil-ai-dev health check failed."
-              exit 1
-            else
-              echo "✅ Deployment complete."
-            fi
-          EOF
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_AI_DEV_HOST }} \
+            "bash ~/scripts/deploy"
