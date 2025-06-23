@@ -1,4 +1,4 @@
-name: AI Docker CD Dev
+name: AI Docker Scheduling CD
 
 on:
   schedule:
