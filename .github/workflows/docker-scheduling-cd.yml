@@ -19,4 +19,4 @@ jobs:
       - name: Run Remote Deployment Script
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_AI_DEV_HOST }} \
-            "bash ~/scripts/deploy"
+            "bash ~/scripts/deploy.sh"
