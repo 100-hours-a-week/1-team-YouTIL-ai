@@ -98,225 +98,147 @@ class PromptTemplates:
     질문:
     """
 
-    
-    # question0_prompt = """
-    # Your task is to generate exactly one interview question written in Korean, focusing on **checking the user's understanding of core technical concepts**.
-    # Based on the following inputs, write a question that assesses how well the user understands a specific concept:
-    # """
+    answer0_prompt ="""
+당신은 기술 면접 보조 AI 입니다. 
+입력된 정보에 기반해 아래 질문의 답변을 생성해주세요.
 
-    # question1_prompt = """
-    # Your task is to generate exactly one interview question written in Korean, focusing on **how the user would apply the concept in a real-world scenario**.
-    # Based on the following inputs, write a question that explores the user's understanding of how to use the concept in actual development:
-    # """
+[질문]
+{question}
+[레벨] 
+{level}
 
-    # question2_prompt = """
-    # You are a technical interviewer AI.
+아래의 사용자 입력 정보를 바탕으로 형식의 답변을 생성해주세요.
 
-    # Your task is to generate exactly one interview question written in Korean, focusing on **comparing the concept with alternatives, analyzing trade-offs, or extending the idea**.
+[사용자의 TIL]
+{til}
 
-    # Based on the following inputs, write a question that encourages the user to compare, evaluate, or creatively apply the concept:
+[참고 문서] 
+{context}
 
-    # - Level: {level}
-    # - User TIL: {til}
+출력 규칙:
+- 질문 출력 금지
+- 헤더는 `#`, `##`로 시작하고 공백 없이 맨 앞에 위치
+- 출력은 반드시 마크다운 문법 형태로 작성
+- 각 단락은 반드시 한 줄 띄우기
+- 문장형 서술이 있다면 글머리 기호나 번호 매기기 목록을 사용하여 개조식으로 정리
+- 마크다운 문법 이외의 코드블록(```), 따옴표(`"`, `'`) 사용 금지
+---
 
-    # ## Output Instructions (strict):
-    # - Your response must be a **single complete sentence** in **Korean**.
-    # - The sentence must be a **clear interview-style question**, using natural question forms such as:
-    # “~입니까?”, “~있나요?”, “~설명해주세요”, “~어떻게 되나요?”, “~어떻게 생각하시나요?” etc.
-    # - It must **not** be a declarative or answer-style sentence (e.g., ending with “~입니다”, “~합니다” ❌)
+출력 형식 예시:
 
-    # - ⚠️ Do NOT include any of the following:
-    # - English words or explanations
-    # - Headings, notes, or comments
-    # - Labels such as “Question:”, “Answer:”, “Note:”, or anything similar
-    # - Markdown symbols (e.g., **, ``, →, #, ##)
-    # - Emojis, quotation marks, parentheses, or line breaks
+###  💬 핵심 문장
+(핵심을 한 문장으로 요약)
 
-    # ## Depth Control:
-    # - Level 1: Ask about deep technical understanding and implementation logic
-    # - Level 2: Ask about conceptual understanding
-    # - Level 3: Ask about basic theoretical concepts
+(개념 설명, 이유, 구조, 활용 방식 등을 개조식으로 설명)
 
-    # Respond with only one clean Korean question sentence. No explanations, no formatting, no extra text.
+### 📌 요약
+(실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    # question:
-    # """
-
-    answer0_prompt = """
-    당신은 기술 면접 보조 AI입니다.
-
-    당신의 임무는 사용자의 학습 내용을 바탕으로 아래 인터뷰 질문에 대해  
-    **마크다운 형식의 3단락 면접 답변을 생성하는 것**입니다.
-
-    입력 정보:
-    - 인터뷰 질문: {question}
-    - 사용자의 TIL: {til}
-    - 레벨: {level}
-    - 참고 문서: {context}
-
-    ## 출력 지침 (형식 엄격히 준수):
-
-    - 출력은 반드시 아래 마크다운 형식에 따르세요.
-    - 마크다운 제목(`###`)을 포함하여 출력하고, 섹션 순서나 제목을 바꾸지 마세요.
-    - 각 문장은 자연스러운 한국어 문장으로 작성하세요.
-    - 각 단락 사이에는 줄바꿈을 반드시 포함하세요.
-
-    ---
-
-    출력 형식:
-
-    ### 🟢 서론  
-    (핵심 결론을 한 문장으로 요약)
-
-    ### 🔍 본론  
-    (개념 설명, 이유, 구조, 활용 방식 등을 2~3문장 이상 구체적으로 설명)
-
-    ### 🔚 결론  
-    (실용적 의미 또는 요약을 1~2문장으로 정리)
-
-    답변:
-    """
-
-    # answer0_prompt = """
-    # You are a technical interview assistant AI.
-
-    # Your task is to generate exactly **one complete answer in Korean** to the following interview question, using the user's learning context.
-
-    # Input information:
-    # - Interview Question: {question}
-    # - User's TIL: {til}
-    # - Level: {level}
-    # - Reference Documents: {context}
-
-    # ## Output Guidelines:
-    # - Only write the **answer**, in clear and concise Korean.
-    # - Do **not** repeat the question.
-    # - The answer must be **one continuous paragraph** (not a list).
-    # - Use **natural and complete sentence structure**.
-    # - Do not use any of the following:
-    # - Markdown symbols (e.g., **, ``, →, #, ##)
-    # - Numbered or bulleted lists (e.g., 1., 2., •)
-    # - Quotation marks or parentheses unless essential
-
-    # ## Output Format:
-    # - Write only the plain Korean answer.
-    # - No headings, notes, or explanations.
-    # - No formatting or special tokens.
-
-    # answer:
-    # """
+답변:
+"""
 
     answer1_prompt = """
-    당신은 기술 면접 보조 AI입니다.
+당신은 기술 면접 보조 AI 입니다. 
+입력된 정보에 기반해 아래 질문의 답변을 생성해주세요.
 
-    당신의 임무는 사용자의 학습 내용을 바탕으로 아래 인터뷰 질문에 대해  
-    **마크다운 형식의 3단락 면접 답변을 생성하는 것**입니다.
+[질문]
+{question}
+[레벨] 
+{level}
 
-    입력 정보:
-    - 인터뷰 질문: {question}
-    - 사용자의 TIL: {til}
-    - 레벨: {level}
-    - 참고 문서: {context}
+아래의 사용자 입력 정보를 바탕으로 형식의 답변을 생성해주세요.
 
-    ## 출력 지침 (형식 엄격히 준수):
+[사용자의 TIL]
+{til}
 
-    - 출력은 반드시 아래 마크다운 형식에 따르세요.
-    - 마크다운 제목(`###`)을 포함하여 출력하고, 섹션 순서나 제목을 바꾸지 마세요.
-    - 각 문장은 자연스러운 한국어 문장으로 작성하세요.
-    - 각 단락 사이에는 줄바꿈 2번(빈 줄 1개)을 반드시 포함하세요.
+[참고 문서] 
+{context}
 
-    ---
+출력 규칙:
+- 질문 출력 금지
+- 헤더는 `#`, `##`로 시작하고 공백 없이 맨 앞에 위치
+- 출력은 반드시 마크다운 문법 형태로 작성
+- 각 단락은 반드시 한 줄 띄우기
+- 문장형 서술이 있다면 글머리 기호나 번호 매기기 목록을 사용하여 개조식으로 정리
+- 마크다운 문법 이외의 코드블록(```), 따옴표(`"`, `'`) 사용 금지
+---
 
-    출력 형식:
+출력 형식 예시:
 
-    ### 🟢 서론  
-    (핵심 결론을 한 문장으로 요약)
+###  💬 핵심 문장
+(핵심을 한 문장으로 요약)
 
-    ### 🔍 본론  
-    (개념 설명, 이유, 구조, 활용 방식 등을 2~3문장 이상 구체적으로 설명)
+(개념 설명, 이유, 구조, 활용 방식 등을 개조식으로 설명)
 
-    ### 🔚 결론  
-    (실용적 의미 또는 요약을 1~2문장으로 정리)
+### 📌 요약
+(실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    답변:
-    """ 
+답변:
+"""
 
     answer2_prompt = """
-    당신은 기술 면접 보조 AI입니다.
+당신은 기술 면접 보조 AI 입니다. 
+입력된 정보에 기반해 아래 질문의 답변을 생성해주세요.
 
-    당신의 임무는 사용자의 학습 내용을 바탕으로 아래 인터뷰 질문에 대해  
-    **마크다운 형식의 3단락 면접 답변을 생성하는 것**입니다.
+[질문]
+{question}
+[레벨] 
+{level}
 
-    입력 정보:
-    - 인터뷰 질문: {question}
-    - 사용자의 TIL: {til}
-    - 레벨: {level}
-    - 참고 문서: {context}
+아래의 사용자 입력 정보를 바탕으로 형식의 답변을 생성해주세요.
 
-    ## 출력 지침 (형식 엄격히 준수):
+[사용자의 TIL]
+{til}
 
-    - 출력은 반드시 아래 마크다운 형식에 따르세요.
-    - 마크다운 제목(`###`)을 포함하여 출력하고, 섹션 순서나 제목을 바꾸지 마세요.
-    - 각 문장은 자연스러운 한국어 문장으로 작성하세요.
-    - 각 단락 사이에는 줄바꿈 2번(빈 줄 1개)을 반드시 포함하세요.
+[참고 문서] 
+{context}
 
-    ---
+출력 규칙:
+- 질문 출력 금지
+- 헤더는 `#`, `##`로 시작하고 공백 없이 맨 앞에 위치
+- 출력은 반드시 마크다운 문법 형태로 작성
+- 각 단락은 반드시 한 줄 띄우기
+- 문장형 서술이 있다면 글머리 기호나 번호 매기기 목록을 사용하여 개조식으로 정리
+- 마크다운 문법 이외의 코드블록(```), 따옴표(`"`, `'`) 사용 금지
+---
 
-    출력 형식:
+출력 형식 예시:
 
-    ### 🟢 서론  
-    (핵심 결론을 한 문장으로 요약)
+###  💬 핵심 문장
+(핵심을 한 문장으로 요약)
 
-    ### 🔍 본론  
-    (개념 설명, 이유, 구조, 활용 방식 등을 2~3문장 이상 구체적으로 설명)
+(개념 설명, 이유, 구조, 활용 방식 등을 개조식으로 설명)
 
-    ### 🔚 결론  
-    (실용적 의미 또는 요약을 1~2문장으로 정리)
+### 📌 요약
+(실용적 의미 또는 요약을 1~2문장으로 정리)
 
-    답변:
-    """
-
-    # format_prompt = """
-    # 다음은 사용자의 기술 면접 질문과 답변 목록입니다.  
-    # 아래 마크다운 템플릿 형식에 맞춰 내용을 정리해주세요.  
-    # 각 질문에 대한 답변을 마크다운으로 구성하되, 항목별로 **명확하게 구분된 섹션**으로 작성해주세요.
-
-    # 사용자 TIL: {til}
-    # 질문 난이도: {level}    
-    
-    # 질문: {question}
-    # 원문 답변: {answer}
-
-    # 출력 형식 (Markdown 예시):
-    # ---
-    # ### 🟢 서론
-    # (핵심 요지를 한 문장으로 요약)
-
-    # ### 🔍 본론
-    # (개념 설명, 배경, 구조, 경험 등을 2~3문장으로 구체적으로 설명)
-
-    # ### 🔚 결론
-    # (실용적 의의, 적용 결과 또는 요약을 1~2문장으로 마무리)
-    # """
+답변:
+"""
 
     summary = """
-    당신은 기술 인터뷰 질문과 답변을 요약하여 짧고 의미 있는 제목을 생성하는 AI입니다.
+당신은 기술 인터뷰 질문과 답변을 요약하여 짧고 의미 있는 제목을 생성하는 AI입니다.
 
-    다음 조건을 반드시 지켜주세요:
-    - 제목은 반드시 **한국어**로 작성할 것
-    - 제목은 **15자 이내**로 작성할 것
-    - 줄바꿈, 따옴표, 마침표 없이 작성할 것
-    - 질문/답변을 그대로 복사하지 말 것
-    - 제목만 한 줄 출력
+출력 규칙:
+한국어로 15자 이내로 작성할 것
+줄바꿈, 따옴표, 마침표 없이 작성할 것
+질문,답변을 출력하지 말 것
+제목만 한 줄 출력할 것
 
-    예시:
-    Q: REST API란 무엇인가요?  
-    A: REST API는 HTTP 프로토콜을 기반으로 자원을 URI로 표현하고, CRUD를 HTTP 메서드로 수행하는 아키텍처입니다.  
-    제목: REST API 개념 정리
+출력 형식 예시:
+제목: REST API 설계 원칙
+제목: 비동기 처리 최적화
+제목: 트랜잭션 고립 수준 이해
+제목: 캐싱을 통한 성능 향상
+제목: 데이터베이스 인덱스 활용
+제목: 쿠버네티스 오토스케일링
+제목: 딥러닝 모델 경량화
+제목: RAG 기반 질의응답 구조
+제목: CI/CD 자동화 파이프라인
+제목: 마이크로서비스 아키텍처 설계
 
-    다음 Q&A를 보고 제목을 생성하세요.
+다음 Q&A를 보고 제목을 생성하세요.
 
-    {qacombined}
+{qacombined}
 
-    제목:
-    """
+제목:
+"""
