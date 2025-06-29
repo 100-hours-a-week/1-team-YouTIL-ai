@@ -1,5 +1,6 @@
 import os
 import logging
+import google.generativeai as genai
 from typing import List
 from qdrant_client import QdrantClient
 from openai import AsyncOpenAI
@@ -14,34 +15,56 @@ class InterviewModels:
     def __init__(self):
         self.base_llm_url = os.getenv("OPENAI_API_BASE")  
         self.api_key = os.getenv("OPENAI_API_KEY") 
+        self.llm = self._load_llm()
         self.qdrant_host = os.getenv("QDRANT_HOST")
         self.qdrant_port = os.getenv("QDRANT_PORT")
-        self.embed_model_name = "BAAI/bge-m3"
-
-        self.llm = self._load_llm()
-        self.embedder = self._load_embedder()
         self.qdrant = self._load_qdrant()
-    
+        self.embed_model_name = "BAAI/bge-m3"
+        self.embedder = self._load_embedder()
+        self.vertex_api_key = os.getenv("VERTEX_API_KEY")
+        self.gemini_model = self._load_gemini()
+
     def _load_llm(self) -> AsyncOpenAI:
         return AsyncOpenAI(
             base_url=self.base_llm_url,
             api_key=self.api_key
         )
-
-    def _load_embedder(self) -> SentenceTransformer:
-        return SentenceTransformer(self.embed_model_name, device="cpu")
-
-    def _load_qdrant(self) -> QdrantClient:
-        return QdrantClient(
-            host=self.qdrant_host,
-            port=self.qdrant_port
+    
+    def _load_gemini(self):
+        """Gemini 모델 초기화"""
+        if self.vertex_api_key:
+            genai.configure(api_key=self.vertex_api_key)
+            return genai.GenerativeModel("gemini-1.5-flash")
+        else:
+            logger.warning("Gemini 호출 비활성화")
+            
+    async def generate_gemini (self,
+                      prompt:str,
+                      max_tokens: int,
+                      temperature: float) -> str:
+        """Gemmini 호출 메서드"""
+        if not self.gemini_model:
+            raise RuntimeError("gemini 모델 초기화 실패")
+        config = genai.types.GenerationConfig(
+            max_output_tokens=max_tokens,
+            temperature=temperature
         )
+        try:
+            response = self.gemini_model.generate_content(
+                prompt,
+                generation_config = config
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini 호출 실패: {e}")
+            raise
 
     async def generate(self, 
                        prompt: str, 
                        max_tokens: int = 512,
                        temperature: float = 0.3,
                        stop: list = None) -> str:
+        """Gemma 호출 메서드"""
         try:
             response = await self.llm.completions.create(
                 model="google/gemma-3-4b-it",
@@ -54,6 +77,15 @@ class InterviewModels:
         except Exception as e:
             logger.error(f"LLM 응답 실패: {e}")
             raise
+
+    def _load_embedder(self) -> SentenceTransformer:
+        return SentenceTransformer(self.embed_model_name, device="cpu")
+
+    def _load_qdrant(self) -> QdrantClient:
+        return QdrantClient(
+            host=self.qdrant_host,
+            port=self.qdrant_port
+        )
 
     def embed_text(self, text: str) -> List[float]:
         try:
