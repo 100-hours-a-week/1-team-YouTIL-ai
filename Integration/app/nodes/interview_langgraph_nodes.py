@@ -45,7 +45,7 @@ class QAFlow:
             )
 
             try:
-                final_text = await model.generate(
+                final_text = await model.generate_gemini(
                     prompt=prompt1,
                     max_tokens=128,
                     temperature=0.5
@@ -119,11 +119,10 @@ class QAFlow:
             )
 
             try:
-                final_text = await model.generate(
+                final_text = await model.generate_gemini(
                     prompt=prompt2,
                     max_tokens=512,
                     temperature=0.3,
-                    stop=["---"]
                 )
 
                 final_text = self.delete_blank(final_text)
@@ -178,7 +177,7 @@ class QAFlow:
 
         for attempt in range(3):
             try:
-                final_text = await model.generate(
+                final_text = await model.generate_gemini(
                     prompt=prompt3,
                     max_tokens=32,
                     temperature=0.3
