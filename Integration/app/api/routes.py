@@ -21,6 +21,7 @@ from app.schemas.Interview_Schema import QAState, ContentState
 from app.evaluation.interview_evaluation.scoring import compute_scores
 from app.evaluation.interview_evaluation.store import store_to_db
 from app.models.interview_model import model
+from app.utils.discord_interview_client import DiscordClientInterview
 
 qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
@@ -31,6 +32,7 @@ router = APIRouter()
 model = get_til_model()
 embedding_model = EmbeddingModel()
 discord_client = DiscordClient()
+discord_client_interview = DiscordClientInterview()
 
 # 비동기 Discord 클라이언트 실행
 asyncio.create_task(discord_client.start(os.getenv("DISCORD_BOT_TOKEN")))
@@ -101,7 +103,7 @@ async def process_til(data: StateModel, background_tasks: BackgroundTasks):
 
 #========================================Interview========================================#
 
-
+asyncio.create_task(discord_client_interview.start(os.getenv("DISCORD_TOKEN")))
 
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -140,6 +142,12 @@ async def generate(data: QAState):
                 "question": question,
                 "answer": answer
             })
+
+        await discord_client_interview.send_interview_to_channel(
+            email=data.email,
+            summary=result["summary"],
+            content=formatted_content, 
+        )
 
         return {
             "summary": result["summary"],
