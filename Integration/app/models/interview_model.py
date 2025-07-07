@@ -44,7 +44,9 @@ class InterviewModels:
                       temperature: float) -> str:
         """Gemmini 호출 메서드"""
         if not self.gemini_model:
-            raise RuntimeError("gemini 모델 초기화 실패")
+            logger.warning("gemini 호출 실패로 Gemma 모델로 대체합니다.")
+            return await self.generate(prompt, max_tokens, temperature)
+
         config = genai.types.GenerationConfig(
             max_output_tokens=max_tokens,
             temperature=temperature
@@ -55,15 +57,22 @@ class InterviewModels:
                 generation_config = config
             )
             return response.text.strip()
+
         except Exception as e:
+            err_msg = str(e)
+
+            if "429" in err_msg or "quota" in err_msg.lower():
+                logger.warning(f"🚨 Gemini 호출 실패 (quota 초과): {err_msg} → Gemma로 fallback")
+                return await self.generate(prompt, max_tokens, temperature)
+
             logger.error(f"Gemini 호출 실패: {e}")
             raise
 
     async def generate(self, 
                        prompt: str, 
                        max_tokens: int = 512,
-                       temperature: float = 0.3,
-                       stop: list = None) -> str:
+                       temperature: float = 0.3,) -> str:
+
         """Gemma 호출 메서드"""
         try:
             response = await self.llm.completions.create(

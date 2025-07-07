@@ -38,10 +38,10 @@ class DiscordClientInterview(discord.Client):
             message = (
                 f"# 📧 이메일: {email}\n\n"
                 f"# 🧐 제목: {summary}\n\n"
-                f"❓ Q{i}. {question}\n {answer}\n\n"
+                f"### Q{i}. {question}\n" 
+                f"{answer}\n\n"
             )
 
-            # 디스코드 메시지 제한 초과 시 자르기
             if len(message) > 2000:
                 message = message[:1990] + "\n(이하 생략)"
 

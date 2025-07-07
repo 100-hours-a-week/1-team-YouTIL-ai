@@ -1,5 +1,5 @@
 from tenacity import retry, stop_after_attempt, wait_fixed
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START
 from langsmith import traceable
 from app.schemas.Interview_Schema import QAState, ContentState
 from app.models.interview_model import model
@@ -85,15 +85,27 @@ class QAFlow:
         return retriever_node
 
     def delete_blank(self, text: str) -> str:
+        # 1. 수평선 "---" 제거 (줄 단독이거나 앞뒤 개행 포함된 경우)
+        text = re.sub(r"(?m)^\s*---+\s*$", "", text)
+
+        # 2. 코드블록 마크다운 제거: ``` 또는 ```markdown
+        text = re.sub(r"```(?:markdown)?", "", text)
+
+        # 3. \n과 헤더 사이가 붙어 있을 경우 \n\n으로 보정
         text = re.sub(r"(?<!\n)\n(###)", r"\n\n\1", text)
 
+        # 4. 헤더 아닌 줄은 들여쓰기 제거
         lines = text.splitlines()
         cleaned_lines = [
             line if line.startswith("###") or line.strip() == "" else line.lstrip()
             for line in lines
         ]
 
-        return "\n".join(cleaned_lines)
+        # 5. 불필요한 연속 개행 제거 (최대 2줄까지만 허용)
+        cleaned_text = "\n".join(cleaned_lines)
+        cleaned_text = re.sub(r"\n{3,}", "\n\n", cleaned_text)
+
+        return cleaned_text.strip()
 
     def generate_answer_node(self, node_id: int):
         @traceable(name=f"답변 생성 노드 {node_id}", run_type="llm")
@@ -215,18 +227,18 @@ class QAFlow:
     def build_graph(self):
         workflow = StateGraph(QAState)
 
-        async def start_node(state: QAState) -> dict:
-            return {}
+        # async def start_node(state: QAState) -> dict:
+        #     return {}
         
-        workflow.add_node("start", start_node)
-        workflow.set_entry_point("start")
+        # workflow.add_node("start", start_node)
+        # workflow.set_entry_point("start")
 
         for i in range(3):
             workflow.add_node(f"que{i}", self.generate_question_node(i))
             workflow.add_node(f"retriever{i}", self.generate_retriever_node(i))
             workflow.add_node(f"ans{i}", self.generate_answer_node(i))
 
-            workflow.add_edge("start", f"que{i}")
+            workflow.add_edge(START, f"que{i}")
             workflow.add_edge(f"que{i}", f"retriever{i}")
             workflow.add_edge(f"retriever{i}", f"ans{i}")
             workflow.add_edge(f"ans{i}", "summary_generate")
