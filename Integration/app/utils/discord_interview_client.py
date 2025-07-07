@@ -38,7 +38,7 @@ class DiscordClientInterview(discord.Client):
             message = (
                 f"# 📧 이메일: {email}\n\n"
                 f"# 🧐 제목: {summary}\n\n"
-                f"### ❓ Q{i}. {question}\n" 
+                f"### Q{i}. {question}\n" 
                 f"{answer}\n\n"
             )
 

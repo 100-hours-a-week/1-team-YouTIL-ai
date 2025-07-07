@@ -1,5 +1,5 @@
 from tenacity import retry, stop_after_attempt, wait_fixed
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START
 from langsmith import traceable
 from app.schemas.Interview_Schema import QAState, ContentState
 from app.models.interview_model import model
@@ -227,18 +227,18 @@ class QAFlow:
     def build_graph(self):
         workflow = StateGraph(QAState)
 
-        async def start_node(state: QAState) -> dict:
-            return {}
+        # async def start_node(state: QAState) -> dict:
+        #     return {}
         
-        workflow.add_node("start", start_node)
-        workflow.set_entry_point("start")
+        # workflow.add_node("start", start_node)
+        # workflow.set_entry_point("start")
 
         for i in range(3):
             workflow.add_node(f"que{i}", self.generate_question_node(i))
             workflow.add_node(f"retriever{i}", self.generate_retriever_node(i))
             workflow.add_node(f"ans{i}", self.generate_answer_node(i))
 
-            workflow.add_edge("start", f"que{i}")
+            workflow.add_edge(START, f"que{i}")
             workflow.add_edge(f"que{i}", f"retriever{i}")
             workflow.add_edge(f"retriever{i}", f"ans{i}")
             workflow.add_edge(f"ans{i}", "summary_generate")

@@ -45,7 +45,7 @@ class InterviewModels:
         """Gemmini 호출 메서드"""
         if not self.gemini_model:
             logger.warning("gemini 호출 실패로 Gemma 모델로 대체합니다.")
-            raise await self.generate(prompt, max_tokens, temperature)
+            return await self.generate(prompt, max_tokens, temperature)
 
         config = genai.types.GenerationConfig(
             max_output_tokens=max_tokens,
@@ -71,8 +71,8 @@ class InterviewModels:
     async def generate(self, 
                        prompt: str, 
                        max_tokens: int = 512,
-                       temperature: float = 0.3,
-                       stop: list = None) -> str:
+                       temperature: float = 0.3,) -> str:
+
         """Gemma 호출 메서드"""
         try:
             response = await self.llm.completions.create(
