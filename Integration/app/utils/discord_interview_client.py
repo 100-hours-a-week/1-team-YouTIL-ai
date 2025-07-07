@@ -1,6 +1,7 @@
 from concurrent.futures import thread
 from multiprocessing.connection import Client
 import discord
+from datetime import datetime
 import os
 import asyncio
 from dotenv import load_dotenv
@@ -17,7 +18,7 @@ class DiscordClientInterview(discord.Client):
         self.ready_event = None
 
     async def on_ready(self):
-        print(f"✔️ Discord 봇 로그인 됨")
+        #print(f"Discord 봇 로그인 됨")
         self.ready_event = True
     
     async def send_interview_to_channel(self, email: str, summary: str, content: list[dict]) -> None:
@@ -25,8 +26,21 @@ class DiscordClientInterview(discord.Client):
         channel = self.get_channel(DISCORD_CHANNEL)
 
         if not channel:
-            print("🚨 채널을 찾을 수 없습니다.")
+            print("❌ 채널을 찾을 수 없습니다.")
             return
+
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 스레드 찾기
+        threads = channel.threads 
+        thread = next((t for t in threads if t.name == today), None)
+
+        if not thread:
+            thread = await channel.create_thread(
+                name=today,
+                type=discord.ChannelType.public_thread,
+                auto_archive_duration=1440  # 24시간 후 자동 보관
+            )
 
         for i, qa in enumerate(content, start=1):
             question = qa.get("question", "").strip()
@@ -45,5 +59,5 @@ class DiscordClientInterview(discord.Client):
             if len(message) > 2000:
                 message = message[:1990] + "\n(이하 생략)"
 
-            await channel.send(content=message)
+            await thread.send(content=message)
             await asyncio.sleep(1)
