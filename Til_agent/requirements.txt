@@ -1,0 +1,36 @@
+# LLM & LangChain
+langchain==0.3.25
+langgraph==0.4.8
+langchain-openai==0.2.1
+langchain-community==0.3.25
+langchain-core==0.3.65
+langsmith==0.3.45
+
+# LLM 지원
+openai==1.88.0
+anthropic==0.52.2
+transformers==4.52.4
+accelerate==1.5.2
+sentence-transformers==3.4.1
+
+
+# 웹 API
+fastapi==0.115.9
+uvicorn==0.34.0
+
+# 유틸 & 데이터 처리
+pydantic==2.10.6
+pydantic-settings==2.8.1
+requests==2.32.3
+python-dotenv==1.0.1
+tqdm==4.67.1
+
+
+# 문서화/요약
+beautifulsoup4==4.13.3
+duckduckgo_search==8.0.4
+
+# 선택적: 시각화, 디버깅, 노트북
+jupyterlab==4.4.3
+matplotlib==3.10.1
+seaborn==0.13.2
