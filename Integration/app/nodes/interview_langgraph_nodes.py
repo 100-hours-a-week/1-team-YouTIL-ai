@@ -39,16 +39,15 @@ class QAFlow:
     def generate_question_node(self, node_id: int):
         @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")
         async def question_node(state: QAState) -> dict:
-            prompt1 = getattr(self.templates, f"question{node_id}_prompt").format(
-                til=state.til,
-                level=state.level,
+            prompt1 = getattr(self.templates, f"question{node_id}_prompt_level{state.level}").format(
+                til=state.til
             )
 
             try:
-                final_text = await model.generate_gemini(
+                final_text = await model.generate(
                     prompt=prompt1,
                     max_tokens=128,
-                    temperature=0.5
+                    temperature=0.7
                 )
 
                 cleaned_question = self.clean_korean_question(final_text)
