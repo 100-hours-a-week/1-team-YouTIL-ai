@@ -27,7 +27,6 @@ tqdm==4.67.1
 
 
 # 문서화/요약
-beautifulsoup4==4.13.3
 duckduckgo_search==8.0.4
 
 # 선택적: 시각화, 디버깅, 노트북

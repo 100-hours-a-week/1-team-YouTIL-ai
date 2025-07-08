@@ -33,7 +33,7 @@ class CommitAnalysisGraph:
                 run_type="chain", 
                 name=f"summarize_code_{node_id}"
                 )
-        async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitAnalysisSchema:
+        async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitDataSchema:
             configurable = MultiAgentConfiguration.from_runnable_config(config)
             model = get_config_value(configurable.supervisor_model)
             llm = ChatOpenAI(model=model)
@@ -90,7 +90,9 @@ class CommitAnalysisGraph:
             }
 
             commit_analysis_result = CommitAnalysisSchema(**result_dict)
-            return {'sections': [commit_analysis_result]}
+            return {
+                'sections': [commit_analysis_result]
+            }
         
         return summarize_code
 
@@ -107,8 +109,7 @@ class CommitAnalysisGraph:
             commit_analysis_graph.add_node(f"summarize_file_node_{node_id}", file_summary_node)
             commit_analysis_graph.add_edge("fork_files_nodes", f"summarize_file_node_{node_id}")
             commit_analysis_graph.add_edge(f"summarize_file_node_{node_id}", END)
-
-
+        
         commit_analysis_graph = commit_analysis_graph.compile()
 
         return commit_analysis_graph

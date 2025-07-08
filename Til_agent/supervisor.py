@@ -14,7 +14,6 @@ from utils import (
 )
 
 from langchain_openai import ChatOpenAI
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from agent_schema import (
     CommitDataSchema,
@@ -25,14 +24,11 @@ from agent_schema import (
     FinishReport,
     TilState,
 )
-
+from utils import kafka_produce
 from prompt import SUPERVISOR_INSTRUCTIONS
 from research_team_agent import research_builder
 from commit_analyze_graph import CommitAnalysisGraph
 
-
-
-# 모델 로딩
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0,)
 
 async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
@@ -40,8 +36,6 @@ async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     search_tool = await get_search_tool(config)
     tools = [tool(Sections), tool(Introduction), tool(Conclusion), tool(FinishReport)]
-    # if configurable.ask_for_clarification:
-    #     tools.append(tool(Question))
     # if search_tool is not None:
     #     tools.append(search_tool)  # Add search tool, if available
     # existing_tool_names = {cast(BaseTool, tool).name for tool in tools}
@@ -61,6 +55,10 @@ async def supervisor(state: TilState, config: RunnableConfig):
 
     # Initialize the model
     llm = ChatOpenAI(model=supervisor_model)
+
+    if state.get("messages") is None:
+        kafka_produce(state["kafka_request"], "SUPERVISOR_START")
+
     
     # If sections have been completed, but we don't yet have the final report, then we need to initiate writing the introduction and conclusion
     if state.get("completed_sections") and not state.get("final_report"):
@@ -136,23 +134,13 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
                        "content": observation, 
                        "name": tool_call["name"], 
                        "tool_call_id": tool_call["id"]})
-        
-        # Store special tool results for processing after all tools have been called
-        # if tool_call["name"] == "Question":
-        #     # Question tool was called - return to supervisor to ask the question
-        #     question_obj = cast(Question, observation)
-        #     result.append({"role": "assistant", "content": question_obj.question})
-        #     return Command(goto=END, update={"messages": result})
+
         if tool_call["name"] == "Sections":
             # sections_list = cast(Sections, observation).sections
             print("[Sections tool called] Ignored; using state.sections instead.")
         elif tool_call["name"] == "Introduction":
             # Format introduction with proper H1 heading if not already formatted
             observation = cast(Introduction, observation)
-            # if not observation.content.startswith("# "):
-            #     intro_content = f"# \n{observation.content}"
-            # else:
-            #     intro_content = observation.content
             intro_content = observation.content
         elif tool_call["name"] == "Conclusion":
             # Format conclusion with proper H2 heading if not already formatted
@@ -164,9 +152,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         elif tool_call["name"] in search_tool_names and configurable.include_source_str:
             source_str += cast(str, observation)
 
-    # After processing all tool calls, decide what to do next
-    print("completed_sections", state["completed_sections"])
-    # 준비: 완료된 filename 목록 만들기
+    # 완료된 filename 목록 만들기
     completed_filenames = {
         os.path.basename(s["filename"] if isinstance(s, dict) else s.filename)
         for s in state.get("completed_sections", [])
@@ -176,26 +162,20 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         s for s in state["sections"]
         if os.path.basename(s["filename"] if isinstance(s, dict) else s.filename) not in completed_filenames
     ]
-    print("pending_sections", pending_sections)
 
     if pending_sections:
+        if state["kafka_request"] is not None:
+            kafka_produce(state["kafka_request"], "RESEARCH_TEAM_START")
         return Command(
             goto=[
                 Send("research_team", {"section": s.dict() if isinstance(s, BaseModel) else s})
                 for s in pending_sections
             ],
             update={"messages": result})
-    
-    # 
-    # if state["sections"]:
-    #     return Command(
-    #     goto=[
-    #         Send("research_team", {"section": s.dict() if isinstance(s, BaseModel) else s})
-    #         for s in state["sections"]
-    #     ],
-    #     update={"messages": result}
-    # )
+
     elif intro_content:
+        if state["kafka_request"] is not None:
+            kafka_produce(state["kafka_request"], "INTRODUCTION_START")
         # Store introduction while waiting for conclusion
         # Append to messages to guide the LLM to write conclusion next
         result.append({"role": "user", "content": "Introduction 작성이 완료되었습니다. 이제 결론 부분을 작성합니다."})
@@ -204,6 +184,8 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             "messages": result,
         }
     elif conclusion_content:
+        if state["kafka_request"] is not None:
+            kafka_produce(state["kafka_request"], "CONCLUSION_START")
         # Get all sections and combine in proper order: Introduction, Body Sections, Conclusion
         intro = state.get("final_report", "")
         body_sections = "\n\n".join(f"## {s.filename}\n\n{s.commit_report}\n\n---" for s in state["completed_sections"])
