@@ -84,6 +84,12 @@ class Sections(BaseModel):
         description="보고서의 각 섹션"
     )
 
+class Concept(BaseModel):
+    """오늘 배운 개념에 대한 정리"""
+    concept: str = Field(
+        description="오늘 배운 개념에 대한 정리",
+    )
+
 class Introduction(BaseModel):
     """보고서의 Introduction 작성"""
     name: str = Field(
@@ -117,6 +123,7 @@ class TilState(MessagesState):
     sections: Annotated[list[CommitAnalysisSchema], operator.add] # List of report sections 
     completed_sections: Annotated[list[CommitReportSchema], operator.add] # Send() API key
     final_report: str # Final report
+    concept: str # Concept
     kafka_request: MessageRequest
     # for evaluation purposes only
     # this is included only if configurable.include_source_str is True

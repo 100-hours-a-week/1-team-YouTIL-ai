@@ -33,7 +33,7 @@ class WorkflowConfiguration:
     """Configuration for the workflow/graph-based implementation (graph.py)."""
     # Common configuration
     report_structure: str = DEFAULT_REPORT_STRUCTURE
-    search_api: SearchAPI = SearchAPI.TAVILY
+    search_api: SearchAPI = SearchAPI.GOOGLESEARCH
     search_api_config: Optional[Dict[str, Any]] = None
     process_search_results: Literal["summarize", "split_and_rerank"] | None = None
     summarization_model_provider: str = "openai"
@@ -48,7 +48,7 @@ class WorkflowConfiguration:
     planner_model: str = "claude-3-7-sonnet-latest"
     planner_model_kwargs: Optional[Dict[str, Any]] = None
     writer_provider: str = "anthropic"
-    writer_model: str = "gpt-4o-miniㄴ"
+    writer_model: str = "gpt-4o-mini"
     writer_model_kwargs: Optional[Dict[str, Any]] = None
 
     @classmethod

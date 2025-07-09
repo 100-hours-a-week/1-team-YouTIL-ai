@@ -23,6 +23,7 @@ from agent_schema import (
     Conclusion,
     FinishReport,
     TilState,
+    Concept,
 )
 from utils import kafka_produce
 from prompt import SUPERVISOR_INSTRUCTIONS
@@ -35,7 +36,7 @@ async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
     """Get supervisor tools based on configuration"""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     search_tool = await get_search_tool(config)
-    tools = [tool(Sections), tool(Introduction), tool(Conclusion), tool(FinishReport)]
+    tools = [tool(Sections), tool(Introduction), tool(Conclusion), tool(FinishReport), tool(Concept)]
     # if search_tool is not None:
     #     tools.append(search_tool)  # Add search tool, if available
     # existing_tool_names = {cast(BaseTool, tool).name for tool in tools}
@@ -62,7 +63,7 @@ async def supervisor(state: TilState, config: RunnableConfig):
     
     # If sections have been completed, but we don't yet have the final report, then we need to initiate writing the introduction and conclusion
     if state.get("completed_sections") and not state.get("final_report"):
-        research_complete_message = {"role": "user", "content": "연구가 완료되었습니다. 이제 보고서의 소개와 결론을 작성하세요. 완성된 본문 섹션은 다음과 같습니다 \n\n" + "\n\n".join([s.commit_report for s in state["completed_sections"]])}
+        research_complete_message = {"role": "user", "content": "연구가 완료되었습니다. 이제 Concept, Introduction, Conclusion을 작성하세요. 완성된 본문 섹션은 다음과 같습니다 \n\n" + "\n\n".join([s.commit_report for s in state["completed_sections"]])}
         messages = messages + [research_complete_message]
 
     # Get tools based on configuration
@@ -108,6 +109,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     sections_list = []
     intro_content = None
     conclusion_content = None
+    concept_content = None
     source_str = ""
 
     # Get tools based on configuration
@@ -138,6 +140,10 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         if tool_call["name"] == "Sections":
             # sections_list = cast(Sections, observation).sections
             print("[Sections tool called] Ignored; using state.sections instead.")
+        elif tool_call["name"] == "Concept":
+            # Format introduction with proper H1 heading if not already formatted
+            observation = cast(Concept, observation)
+            concept_content = observation.concept
         elif tool_call["name"] == "Introduction":
             # Format introduction with proper H1 heading if not already formatted
             observation = cast(Introduction, observation)
@@ -172,7 +178,12 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
                 for s in pending_sections
             ],
             update={"messages": result})
-
+    elif concept_content:
+        result.append({"role": "user", "content": "본문 섹션 작성이 완료되었습니다. 이제 오늘 배운 개념에 대한 정리를 작성합니다."})
+        state_update = {
+            "concept": concept_content,
+            "messages": result,
+        }
     elif intro_content:
         if state["kafka_request"] is not None:
             kafka_produce(state["kafka_request"], "INTRODUCTION_START")
@@ -191,7 +202,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         body_sections = "\n\n".join(f"## {s.filename}\n\n{s.commit_report}\n\n---" for s in state["completed_sections"])
         
         # Assemble final report in correct order
-        complete_report = f"# 📅 {get_today_str()} TIL\n\n{intro}\n\n{body_sections}\n\n{conclusion_content}"
+        complete_report = f"# 📅 {get_today_str()} TIL\n\n{intro}\n\n{state.get('concept', '')}\n\n{body_sections}\n\n{conclusion_content}"
         
         # Append to messages to indicate completion
         result.append({"role": "user", "content": "TIL(Today I Leared)의 개요, 본문 섹션, 회고 부분이 작성 완료되었습니다."})

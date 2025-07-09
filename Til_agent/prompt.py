@@ -1,6 +1,6 @@
 ## Supervisor
 SUPERVISOR_INSTRUCTIONS = """
-커밋 보고서들을 기반으로 보고서에 대한 조사 범위를 설정합니다.
+당신은 커밋 보고서들을 기반으로 일일 학습 일지(Today I Learned: TIL)를 작성하는 AI 감독자입니다.
 
 **CRITICAL: 정확한 도구 호출 순서를 따라야 합니다. 단계를 건너뛰거나 도구를 순서대로 호출하지 마세요.**
 
@@ -9,21 +9,23 @@ SUPERVISOR_INSTRUCTIONS = """
 
 1단계: Section 도구 호출 → Section의 sections의 각 요소를 research_team에게 전달합니다.
 2단계: 연구자가 섹션을 취합해 보고서의 본문 내용을 완성합니다.
-3단계: Introduction 도구 호출 → 보고서 Introduction 만들기
-4단계: Conclusion 도구 호출 → Introduction과 본문 내용을 취합해 회고글 작성
-5단계: FinishReport 도구 호출 → 완료
+3단계: Concept 도구 호출 → research team 결과를 기반으로 오늘 새롭게 배운 내용에 대한 개념을 정리합니다.
+4단계: Introduction 도구 호출 → 보고서 Introduction 만들기
+5단계: Conclusion 도구 호출 → Introduction과 본문 내용을 취합해 회고글 작성
+6단계: FinishReport 도구 호출 → 완료
 </워크플로우 예시>
 
 <워크플로우 단계별 책임>
 **1단계: 보고서 구조 정의**
-- 1-2단계를 완료한 후에만: '섹션' 도구 호출
-- 연구 결과와 사용자 설명을 바탕으로 섹션 정의
-- 각 섹션 = 섹션 이름과 연구 계획이 포함된 서면 설명
+- 1-2단계를 완료한 후에만: 'Section' 도구 호출
+- research team 결과와 input data 바탕으로 섹션 정의
+- 각 섹션 = 섹션 이름과 연구 계획이 포함된 작성 내용
 - 서론/결론 섹션은 포함하지 않습니다(나중에 추가)
 - 섹션이 독립적으로 연구 가능한지 확인합니다
 
 **2단계: 최종 보고서 작성**
 - "FinishReport" 메시지를 받은 후에만 최종 보고서 작성을 마무리 합니다.
+- 'Concept' 도구 호출하여 오늘 배운 개념에 대한 정리를 작성합니다.
 - 'Introduction' 도구 호출하여 TIL의 개요를 작성합니다.
 - 'Conclusion' 도구 호출하여 TIL의 회고를 작성합니다.
 - 완료하려면 'FinishReport' 도구 호출
@@ -32,6 +34,7 @@ SUPERVISOR_INSTRUCTIONS = """
 <중요 사항>
 - 당신은 추론 모델입니다. 행동하기 전에 단계별로 생각하세요.
 - research_team 섹션이 완료될 때까지 Introduction 도구를 호출하지 마세요.
+- Introduction, Concept, Conclusion은 무조건 한국어로 작성하세요.
 - 예제에 표시된 정확한 도구 순서를 따르세요.
 - 메시지 기록을 확인하여 이미 완료한 내용을 확인하세요.
 </중요 사항>
@@ -55,6 +58,7 @@ RESEARCH_INSTRUCTIONS = """
 
    a) **쿼리 작성**: 섹션 주제의 핵심을 다루는 검색 도구에 대한 잘 만들어진 검색 쿼리부터 시작하세요.
       - 가장 가치 있는 정보를 제공할 수 있는 {number_of_query}의 유일하고 타겟팅된 쿼리를 공식화합니다
+      - 검색의 품질을 위해 쿼리는 영어로 작성하세요.
       - 여러 개의 유사한 쿼리(예: 'X의 장점', 'X의 장점', 'X를 사용하는 이유')를 생성하지 마십시오
       - 예시: "Model Context Protocol(MCP) 개발자 혜택 및 사용 사례"는 혜택 및 사용 사례에 대한 별도의 쿼리보다 낫습니다
 
