@@ -25,6 +25,10 @@ app = FastAPI()
 
 @app.post("/generate_til")
 async def commit_analysis(state: InputSchema):
+    username = state.owner
+    date = state.date
+    repo = state.repo  
+
     try:
         commit_data = get_commit_data(
             owner=state.owner, 
@@ -46,7 +50,7 @@ async def commit_analysis(state: InputSchema):
             kafka_produce(
                 message=state.kafka_request, 
                 process="COMMIT_ANALYSIS_START"
-            )   
+            )
         
         graph = await SupervisorGraph(no_files=no_files).make_supervisor_graph()
 
@@ -54,8 +58,13 @@ async def commit_analysis(state: InputSchema):
         final_result = await graph.ainvoke(input_commit)
 
         selected_output = {
-            "final_report": final_result["final_report"],
-            "source_str": final_result["source_str"],
+            "username": username,
+            "repo": repo,
+            "date": date,
+            "content": final_result["final_report"],
+            # 검색 결과 출력 필요 시 주석 해제
+            # "source_str": final_result["source_str"],
+            "keywords": final_result["keywords"][:3],
         }
 
     except Exception as e:
@@ -63,18 +72,3 @@ async def commit_analysis(state: InputSchema):
         return {"error": str(e)}
 
     return selected_output
-
-
-
-@app.post("/produce")
-async def produce(body: MessageRequest):
-    try:
-        # Kafka 메시지 전송
-        body_dict = body.message.dict()
-        body_json = json.dumps(body_dict)
-        producer.produce(topic="ai.til.process", key=body.requestId, value=body_json.encode("utf-8"))
-        producer.flush()
-        return {"status": "sent", "message": body.message}
-    except Exception as e:
-        logging.exception("Failed to send")
-        return {"error": str(e)}

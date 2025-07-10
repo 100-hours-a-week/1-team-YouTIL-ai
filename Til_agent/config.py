@@ -29,46 +29,8 @@ class SearchAPI(Enum):
     NONE = "none"
 
 @dataclass(kw_only=True)
-class WorkflowConfiguration:
-    """Configuration for the workflow/graph-based implementation (graph.py)."""
-    # Common configuration
-    report_structure: str = DEFAULT_REPORT_STRUCTURE
-    search_api: SearchAPI = SearchAPI.GOOGLESEARCH
-    search_api_config: Optional[Dict[str, Any]] = None
-    process_search_results: Literal["summarize", "split_and_rerank"] | None = None
-    summarization_model_provider: str = "openai"
-    summarization_model: str = "gpt-4o-mini"
-    max_structured_output_retries: int = 3
-    include_source_str: bool = False
-    
-    # Workflow-specific configuration
-    number_of_queries: int = 1 # Number of search queries to generate per iteration
-    max_search_depth: int = 2 # Maximum number of reflection + search iterations
-    planner_provider: str = "anthropic"
-    planner_model: str = "claude-3-7-sonnet-latest"
-    planner_model_kwargs: Optional[Dict[str, Any]] = None
-    writer_provider: str = "anthropic"
-    writer_model: str = "gpt-4o-mini"
-    writer_model_kwargs: Optional[Dict[str, Any]] = None
-
-    @classmethod
-    def from_runnable_config(
-        cls, config: Optional[RunnableConfig] = None
-    ) -> "WorkflowConfiguration":
-        """Create a WorkflowConfiguration instance from a RunnableConfig."""
-        configurable = (
-            config["configurable"] if config and "configurable" in config else {}
-        )
-        values: dict[str, Any] = {
-            f.name: os.environ.get(f.name.upper(), configurable.get(f.name))
-            for f in fields(cls)
-            if f.init
-        }
-        return cls(**{k: v for k, v in values.items() if v})
-
-@dataclass(kw_only=True)
 class MultiAgentConfiguration:
-    """Configuration for the multi-agent implementation (multi_agent.py)."""
+    """Configuration for the multi-agent implementation"""
     # Common configuration
     search_api: SearchAPI = SearchAPI.TAVILY
     search_api_config: Optional[Dict[str, Any]] = None
@@ -79,6 +41,7 @@ class MultiAgentConfiguration:
     
     # Multi-agent specific configuration
     number_of_queries: int = 2 # Number of search queries to generate per section
+    code_analysis_model: str = "gpt-3.5-turbo"
     supervisor_model: str = "gpt-4o-mini"
     researcher_model: str = "gpt-4o-mini"
     ask_for_clarification: bool = False # Whether to ask for clarification from the user
@@ -101,6 +64,3 @@ class MultiAgentConfiguration:
             if f.init
         }
         return cls(**{k: v for k, v in values.items() if v})
-
-# Keep the old Configuration class for backward compatibility
-Configuration = WorkflowConfiguration

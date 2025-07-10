@@ -26,7 +26,7 @@ from agent_schema import (
     Concept,
 )
 from utils import kafka_produce
-from prompt import SUPERVISOR_INSTRUCTIONS
+from prompt import SUPERVISOR_INSTRUCTIONS, INSTRUCTION_WRITER_INSTRUCTIONS
 from research_team_agent import research_builder
 from commit_analyze_graph import CommitAnalysisGraph
 
@@ -110,6 +110,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     intro_content = None
     conclusion_content = None
     concept_content = None
+    concept_keywords = []
     source_str = ""
 
     # Get tools based on configuration
@@ -144,6 +145,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             # Format introduction with proper H1 heading if not already formatted
             observation = cast(Concept, observation)
             concept_content = observation.concept
+            concept_keywords = observation.keywords
         elif tool_call["name"] == "Introduction":
             # Format introduction with proper H1 heading if not already formatted
             observation = cast(Introduction, observation)
@@ -152,7 +154,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             # Format conclusion with proper H2 heading if not already formatted
             observation = cast(Conclusion, observation)
             if not observation.content.startswith("## "):
-                conclusion_content = f"\n{observation.content}"
+                conclusion_content = f"{observation.content}"
             else:
                 conclusion_content = observation.content
         elif tool_call["name"] in search_tool_names and configurable.include_source_str:
@@ -179,9 +181,11 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             ],
             update={"messages": result})
     elif concept_content:
-        result.append({"role": "user", "content": "본문 섹션 작성이 완료되었습니다. 이제 오늘 배운 개념에 대한 정리를 작성합니다."})
+        body = "\n\n".join(f"## {s.filename}\n\n{s.commit_report}" for s in state["completed_sections"])
+        result.append({"role": "user", "content": INSTRUCTION_WRITER_INSTRUCTIONS.format(body=body)})
         state_update = {
             "concept": concept_content,
+            "keywords": concept_keywords,
             "messages": result,
         }
     elif intro_content:
@@ -199,10 +203,10 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             kafka_produce(state["kafka_request"], "CONCLUSION_START")
         # Get all sections and combine in proper order: Introduction, Body Sections, Conclusion
         intro = state.get("final_report", "")
-        body_sections = "\n\n".join(f"## {s.filename}\n\n{s.commit_report}\n\n---" for s in state["completed_sections"])
+        body_sections = "\n\n".join(f"# {s.filename}\n\n{s.commit_report}\n---" for s in state["completed_sections"])
         
         # Assemble final report in correct order
-        complete_report = f"# 📅 {get_today_str()} TIL\n\n{intro}\n\n{state.get('concept', '')}\n\n{body_sections}\n\n{conclusion_content}"
+        complete_report = f"# 📅 {state.get('date', '')} TIL\n\n{intro}\n\n{body_sections}\n# 회고\n{conclusion_content}"
         
         # Append to messages to indicate completion
         result.append({"role": "user", "content": "TIL(Today I Leared)의 개요, 본문 섹션, 회고 부분이 작성 완료되었습니다."})

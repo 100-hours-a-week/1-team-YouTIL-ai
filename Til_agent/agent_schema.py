@@ -21,7 +21,7 @@ class PatchSchema(BaseModel):
     patch:str = Field(description="커밋된 코드 변경 사항")
 
 class FileSchema(BaseModel):
-    filepath:str = Field(description="커밋된 파일 이름(이렉토리 경로 포함)")
+    filepath:str = Field(description="커밋된 파일 이름(디렉토리 경로 포함)")
     latest_code:str = Field(description= "커밋이 반영된 최신 버전의 코드")
     node_id: Optional[int] = Field(default=None, description="커밋된 파일의 노드 아이디")
     patches:List[PatchSchema]
@@ -89,6 +89,9 @@ class Concept(BaseModel):
     concept: str = Field(
         description="오늘 배운 개념에 대한 정리",
     )
+    keywords: List[str] = Field(
+        description="오늘 배운 개념에 대한 키워드"
+    )
 
 class Introduction(BaseModel):
     """보고서의 Introduction 작성"""
@@ -115,14 +118,15 @@ class FinishReport(BaseModel):
 ## State
 class TilStateOutput(MessagesState):
     final_report: str # Final report
-    # for evaluation purposes only
-    # this is included only if configurable.include_source_str is True
+    keywords: List[str] # Keywords
     source_str: Annotated[str, operator.add] # String of formatted source content from web search
 
 class TilState(MessagesState):
+    date: str # Date
     sections: Annotated[list[CommitAnalysisSchema], operator.add] # List of report sections 
     completed_sections: Annotated[list[CommitReportSchema], operator.add] # Send() API key
     final_report: str # Final report
+    keywords: List[str] # Keywords
     concept: str # Concept
     kafka_request: MessageRequest
     # for evaluation purposes only

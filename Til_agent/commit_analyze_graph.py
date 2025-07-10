@@ -3,7 +3,6 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
-from commit_analysis_tools import CommitTools
 from agent_schema import (
     CommitDataSchema,
     CommitAnalysisSchema,
@@ -24,7 +23,10 @@ class CommitAnalysisGraph:
         files = state.files
         for idx, file in enumerate(files):
             file.node_id = idx + 1
-        return {"files": files}
+        return {
+            "files": files,
+            "date": state.date,
+        }
 
     ## code analysis nodes
     @staticmethod
@@ -35,16 +37,15 @@ class CommitAnalysisGraph:
                 )
         async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitDataSchema:
             configurable = MultiAgentConfiguration.from_runnable_config(config)
-            model = get_config_value(configurable.supervisor_model)
-            llm = ChatOpenAI(model=model)
+            model = get_config_value(configurable.code_analysis_model)
+            llm = ChatOpenAI(model=model, temperature=0)
             files = state.files
             system_prompt = COMMIT_REVIEW_INSTRUCTIONS
             user_prompt = """[file name]: {file_name}
     --------------------------------
     [code]: {code}
     --------------------------------
-    [patches]: {patches}
-            """
+    [patches]: {patches}"""
             
             target_file = None
             for file in files:
@@ -74,7 +75,7 @@ class CommitAnalysisGraph:
                 | StrOutputParser()
             )
             
-            result: CommitAnalysisSchema = code_analysis_chain.invoke(
+            result: CommitAnalysisSchema = await code_analysis_chain.ainvoke(
                 {
                     "file_name": file_name, 
                     "code": code, 
@@ -90,9 +91,7 @@ class CommitAnalysisGraph:
             }
 
             commit_analysis_result = CommitAnalysisSchema(**result_dict)
-            return {
-                'sections': [commit_analysis_result]
-            }
+            return {'sections': [commit_analysis_result]}
         
         return summarize_code
 
