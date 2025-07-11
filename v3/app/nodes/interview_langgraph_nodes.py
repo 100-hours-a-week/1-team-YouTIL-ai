@@ -4,6 +4,7 @@ from app.schemas.Interview_Schema import QAState, ContentState
 from app.models.interview_model import model
 from langchain.chat_models import init_chat_model
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 import logging
 import re
 
@@ -40,7 +41,8 @@ class QAFlow:
     def generate_question_node(self, node_id: int):
         @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")
         async def question_node(state: QAState) -> dict:
-            prompt1 = getattr(self.templates, f"question{node_id}_prompt_level{state.level}")
+            prompt1_str = getattr(self.templates, f"question{node_id}_prompt_level{state.level}")
+            prompt1 = ChatPromptTemplate.from_template(prompt1_str)
 
             try:
                 llm = init_chat_model(
@@ -131,7 +133,8 @@ class QAFlow:
             context = getattr(state, f"retrieved_texts{node_id}", None)
             context = "\n\n".join(context) if context else ""
 
-            prompt2 = getattr(self.templates, f"answer{node_id}_prompt")
+            prompt2_str = getattr(self.templates, f"answer{node_id}_prompt")
+            prompt2 = ChatPromptTemplate.from_template(prompt2_str)
 
             try:
                 llm = init_chat_model(
@@ -197,7 +200,8 @@ class QAFlow:
             f"Q: {item.question}\nA: {item.answer}" for item in merged
         )
 
-        prompt3 = self.templates.summary
+        prompt3_str = self.templates.summary
+        prompt3 = ChatPromptTemplate.from_template(prompt3_str)
 
         last_valid = None
 
@@ -249,7 +253,6 @@ class QAFlow:
             "content": merged
         }
         
-
     def build_graph(self):
         workflow = StateGraph(QAState)
 
