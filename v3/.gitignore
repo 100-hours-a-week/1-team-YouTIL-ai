@@ -1,0 +1,18 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 환경파일
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 시스템
+.DS_Store
+
+/app/Docker/grafana/
+
+/home/yuri011228/1-team-YouTIL-ai/venv
