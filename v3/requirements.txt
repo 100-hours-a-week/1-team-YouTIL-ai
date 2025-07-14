@@ -67,7 +67,7 @@ huggingface-hub==0.33.2
 hyperframe==6.1.0
 idna==3.10
 ipykernel==6.29.5
-ipython==9.4.0
+ipython==8.37.0
 ipython_pygments_lexers==1.1.1
 isoduration==20.11.0
 jedi==0.19.2
