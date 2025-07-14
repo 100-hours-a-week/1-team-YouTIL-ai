@@ -1,4 +1,4 @@
-from langsmith import traceable
+from langfuse import observe
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, START, END
@@ -21,7 +21,11 @@ class CommitAnalysisGraph:
         self.no_files = no_files
 
     @staticmethod
-    @traceable(run_type="tool")
+    @observe(
+        name="fork_files_nodes",
+        # capture_input=lambda state: {"file_count": len(state.files)},
+        # capture_output=lambda result: {"forked_file_ids": [f.node_id for f in result["files"]]},
+    )
     async def fork_files_nodes(state: CommitDataSchema) -> dict:
         files = state.files
         for idx, file in enumerate(files):
@@ -34,10 +38,13 @@ class CommitAnalysisGraph:
     ## code analysis nodes
     @staticmethod
     def make_code_summary_node(node_id: int):
-        @traceable(
-                run_type="chain", 
-                name=f"summarize_code_{node_id}"
-                )
+        @observe(
+            name=f"summarize_code_node_{node_id}",
+            # capture_input=lambda state, config: {
+            #     "file": next((f.filepath for f in state.files if f.node_id == node_id), "N/A")
+            # },
+            # capture_output=lambda result: {"summary_snippet": result["sections"][0].code_review[:200]},
+        )
         async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitDataSchema:
             configurable = MultiAgentConfiguration.from_runnable_config(config)
             model = get_config_value(configurable.code_analysis_model)

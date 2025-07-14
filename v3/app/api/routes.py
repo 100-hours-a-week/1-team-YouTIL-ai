@@ -16,6 +16,10 @@ from app.Til_agent.agent_schema import InputSchema, CommitDataSchema
 from app.Til_agent.supervisor import SupervisorGraph
 from app.Til_agent.commit_analysis_tools import CommitTools
 
+import uuid
+from langfuse.langchain import CallbackHandler
+from langfuse import get_client, Langfuse
+
 #=====================================Interview=====================================#
 from app.prompts.Interview_Prompts import PromptTemplates
 from app.nodes.interview_langgraph_nodes import QAFlow
@@ -29,7 +33,7 @@ qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
 load_dotenv()
 
-
+os.environ["OTEL_EXPORTER_OTLP_TIMEOUT"] = "600" 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -73,7 +77,6 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
 
 @router.post("/til")
 async def commit_analysis(state: InputSchema):
-    print(state)
     username = state.owner
     date = state.date
     repo = state.repo  
@@ -91,7 +94,7 @@ async def commit_analysis(state: InputSchema):
                 message=state.kafka_request, 
                 process="GET_COMMIT_DATA_FROM_GITHUB"
             )
-
+        
         input_commit = CommitDataSchema(**commit_data)
         no_files = len(input_commit.files)
 
@@ -102,9 +105,22 @@ async def commit_analysis(state: InputSchema):
             )
         
         graph = await SupervisorGraph(no_files=no_files).make_supervisor_graph()
-
         input_commit.kafka_request = state.kafka_request
-        final_result = await graph.ainvoke(input_commit)
+
+
+        session_id = str(uuid.uuid4())
+        langfuse = get_client()
+        callback_handler = CallbackHandler()
+        
+        with langfuse.start_as_current_span(name="dynamic-langchain-trace") as span:
+            span.update_trace(
+                user_id=state.owner,
+                session_id=session_id,
+                input=input_commit
+            )
+
+            final_result = await graph.ainvoke(input_commit, config={"callbacks": [callback_handler]})
+            # span.update_trace(output={"response": final_result})
 
         selected_output = {
             "username": username,
@@ -116,7 +132,7 @@ async def commit_analysis(state: InputSchema):
             "keywords": final_result["keywords"][:3],
         }
 
-        #         # 디스코드 팀 채널에 til 결과 전달
+        # 디스코드 팀 채널에 til 결과 전달
         await discord_client.send_til_to_thread(
             content=selected_output["content"],
             username=selected_output["username"]

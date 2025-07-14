@@ -2,6 +2,9 @@ FROM python:3.11-slim
 
 # 시스템 의존성 설치 (ML 패키지들을 위해)
 RUN apt-get update && apt-get install -y \
+    iputils-ping \
+    dnsutils \
+    curl \
     gcc \
     g++ \
     git \
@@ -14,11 +17,12 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # requirements 복사 및 설치 (캐시 최적화)
 COPY requirements.txt .
-RUN  pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스 코드 복사
 COPY . .
+
+ENV LANGFUSE_DISABLE_TELEMETRY=true
 
 # 포트 노출
 EXPOSE 8000

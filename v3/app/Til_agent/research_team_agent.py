@@ -1,11 +1,9 @@
 from langchain_core.tools import BaseTool
 from tavily import AsyncTavilyClient
 from langchain_core.tools import tool
-from langsmith import traceable
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from typing import List, Annotated, Literal, cast
-from langsmith import traceable
 
 from .utils import get_config_value
 from .config import MultiAgentConfiguration
@@ -13,6 +11,7 @@ from .prompt import RESEARCH_INSTRUCTIONS
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 
+from langfuse import observe
 from typing import Union
 from .agent_schema import (
     ReportState, 
@@ -293,7 +292,7 @@ async def google_search_async(search_queries: Union[str, List[str]], max_results
             executor.shutdown(wait=False)
 
 
-@traceable
+@observe(name="tavily_search_async")
 async def tavily_search_async(search_queries, max_results: int = 5, topic: Literal["general", "news", "finance"] = "general", include_raw_content: bool = True):
     """
     Tavily API를 사용하여 동시 웹 검색을 수행합니다.
@@ -429,6 +428,7 @@ async def get_research_tools(config: RunnableConfig) -> list[BaseTool]:
     # existing_tool_names = {cast(BaseTool, tool).name for tool in tools}
     return tools
 
+@observe(name="research_agent")
 async def research_agent(state: ReportState, config: RunnableConfig):
     """LLM이 도구를 호출할지 여부를 결정합니다"""
     commit_analysis_result = state["section"]
@@ -473,6 +473,11 @@ async def research_agent(state: ReportState, config: RunnableConfig):
         ]
     }
 
+@observe(
+    name="research_agent_tools",
+    # capture_input=lambda state, **_: {"tool_calls": len(state['messages'][-1].tool_calls)},
+    # capture_output=None
+)
 async def research_agent_tools(state: ReportState, config: RunnableConfig):
     """도구 호출을 수행하고 에이전트에게 전달하거나 연구 루프를 지속합니다"""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
