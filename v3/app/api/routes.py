@@ -132,11 +132,11 @@ async def commit_analysis(state: InputSchema):
             "keywords": final_result["keywords"][:3],
         }
 
-        #         # 디스코드 팀 채널에 til 결과 전달
-        # await discord_client.send_til_to_thread(
-        #     content=selected_output["content"],
-        #     username=selected_output["username"]
-        # )
+        # 디스코드 팀 채널에 til 결과 전달
+        await discord_client.send_til_to_thread(
+            content=selected_output["content"],
+            username=selected_output["username"]
+        )
 
     except Exception as e:
         traceback.print_exc()
