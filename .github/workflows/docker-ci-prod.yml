@@ -3,7 +3,7 @@ name: AI Docker CI Prod
 on:
   push:
     branches:
-      - main
+      - prod
     paths-ignore:
       - '.github/workflows/**'
   workflow_dispatch:
