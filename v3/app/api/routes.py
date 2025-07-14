@@ -7,18 +7,23 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 #========================================TIL========================================#
-from app.schemas.Til_Schema import StateModel
-from app.models import get_til_model
-from app.models import EmbeddingModel
-from app.nodes.til_langgraph_nodes import Langgraph
 from app.evaluation.til_evaluation.evaluate import TilEvaluator
 from app.utils.discord_client import DiscordClient
+from app.models.embedding import EmbeddingModel
+
+from app.Til_agent.utils import kafka_produce
+from app.Til_agent.agent_schema import InputSchema, CommitDataSchema
+from app.Til_agent.supervisor import SupervisorGraph
+from app.Til_agent.commit_analysis_tools import CommitTools
+
+import uuid
+from langfuse.langchain import CallbackHandler
+from langfuse import get_client, Langfuse
 
 #=====================================Interview=====================================#
 from app.prompts.Interview_Prompts import PromptTemplates
-#from app.prompts.Question_Prompt import QuestionPromptTemplates
 from app.nodes.interview_langgraph_nodes import QAFlow
-from app.schemas.Interview_Schema import QAState, ContentState
+from app.schemas.Interview_Schema import QAState
 from app.evaluation.interview_evaluation.scoring import compute_scores
 from app.evaluation.interview_evaluation.store import store_to_db
 from app.models.interview_model import model
@@ -26,14 +31,17 @@ from app.utils.discord_interview_client import DiscordClientInterview
 
 qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
-
 load_dotenv()
+
+os.environ["OTEL_EXPORTER_OTLP_TIMEOUT"] = "600" 
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
-model = get_til_model()
 embedding_model = EmbeddingModel()
 discord_client = DiscordClient()
 discord_client_interview = DiscordClientInterview()
+
+get_commit_data = CommitTools.get_commit_data
 
 # 비동기 Discord 클라이언트 실행
 asyncio.create_task(discord_client.start(os.getenv("DISCORD_BOT_TOKEN")))
@@ -67,40 +75,77 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
     except Exception as e:
         logger.error(f"[TIL 평가 실패] {e}")
 
+@router.post("/til")
+async def commit_analysis(state: InputSchema):
+    username = state.owner
+    date = state.date
+    repo = state.repo  
 
-@router.post("/til", tags=["TIL"])
-async def process_til(data: StateModel, background_tasks: BackgroundTasks):
     try:
-        files_num = len(data.files)
-        graph = Langgraph(files_num=files_num, model=model, embedding=embedding_model)
-        result = await graph.graph.ainvoke(data)
-        til_json = result["til_json"]
-        til_json_dict = til_json.dict(exclude={"vector"})
+        commit_data = get_commit_data(
+            owner=state.owner, 
+            repo=state.repo, 
+            branch=state.branch, 
+            sha_list=state.sha_list
+        )
+        
+        if state.kafka_request is not None:
+            kafka_produce(
+                message=state.kafka_request, 
+                process="GET_COMMIT_DATA_FROM_GITHUB"
+            )
+        
+        input_commit = CommitDataSchema(**commit_data)
+        no_files = len(input_commit.files)
 
-        keywords = til_json_dict["keywords"]["keywords_list"]
+        if state.kafka_request is not None:
+            kafka_produce(
+                message=state.kafka_request, 
+                process="COMMIT_ANALYSIS_START"
+            )
+        
+        graph = await SupervisorGraph(no_files=no_files).make_supervisor_graph()
+        input_commit.kafka_request = state.kafka_request
 
-        til_json_dict["keywords"] = keywords
+
+        session_id = str(uuid.uuid4())
+        langfuse = get_client()
+        callback_handler = CallbackHandler()
+        
+        with langfuse.start_as_current_span(name="dynamic-langchain-trace") as span:
+            span.update_trace(
+                user_id=state.owner,
+                session_id=session_id,
+                input=input_commit
+            )
+
+            final_result = await graph.ainvoke(input_commit, config={"callbacks": [callback_handler]})
+            # span.update_trace(output={"response": final_result})
+
+        selected_output = {
+            "username": username,
+            "repo": repo,
+            "date": date,
+            "content": final_result["final_report"],
+            # 검색 결과 출력 필요 시 주석 해제
+            # "source_str": final_result["source_str"],
+            "keywords": final_result["keywords"][:3],
+        }
 
         # 디스코드 팀 채널에 til 결과 전달
         await discord_client.send_til_to_thread(
-            content=til_json_dict["content"],
-            username=til_json_dict["username"]
+            content=selected_output["content"],
+            username=selected_output["username"]
         )
-        # MySQL DB에 전달할 사용자 정보
-        metadata = {
-            "username": til_json_dict["username"],
-            "commit_date": til_json_dict["date"],
-            "repo": til_json_dict["repo"],
-            "content": til_json_dict["content"]
-        }
-
-        # evaluation 과정은 backgroun에서 수행해 til 생성시 클라이언트에게 바로 전달
-        background_tasks.add_task(evaluate_and_save_mysql, til_json_dict["content"], metadata, connection_info)
-        return til_json_dict
 
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}
+
+    return {
+        "content":selected_output["content"],
+        "keywords":selected_output["keywords"]
+    }
 
 #========================================Interview========================================#
 

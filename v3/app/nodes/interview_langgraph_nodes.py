@@ -1,8 +1,10 @@
-from tenacity import retry, stop_after_attempt, wait_fixed
 from langgraph.graph import StateGraph, START
 from langsmith import traceable
 from app.schemas.Interview_Schema import QAState, ContentState
 from app.models.interview_model import model
+from langchain.chat_models import init_chat_model
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 import logging
 import re
 
@@ -39,16 +41,25 @@ class QAFlow:
     def generate_question_node(self, node_id: int):
         @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")
         async def question_node(state: QAState) -> dict:
-            prompt1 = getattr(self.templates, f"question{node_id}_prompt_level{state.level}").format(
-                til=state.til
-            )
+            prompt1_str = getattr(self.templates, f"question{node_id}_prompt_level{state.level}")
+            prompt1 = ChatPromptTemplate.from_template(prompt1_str)
 
             try:
-                final_text = await model.generate(
-                    prompt=prompt1,
-                    max_tokens=128,
-                    temperature=0.7
+                llm = init_chat_model(
+                    model="gpt-4o-mini",
+                    max_tokens = 128,
+                    temperature = 0.7
                 )
+
+                question_chain = (
+                    prompt1
+                    | llm
+                    | StrOutputParser()
+                )
+
+                final_text = await question_chain.ainvoke({
+                    "til": state.til
+                })
 
                 cleaned_question = self.clean_korean_question(final_text)
                 return {f"question{node_id}": cleaned_question}
@@ -122,19 +133,28 @@ class QAFlow:
             context = getattr(state, f"retrieved_texts{node_id}", None)
             context = "\n\n".join(context) if context else ""
 
-            prompt2 = getattr(self.templates, f"answer{node_id}_prompt").format(
-                question=question,
-                til=state.til,
-                level=state.level,
-                context=context
-            )
+            prompt2_str = getattr(self.templates, f"answer{node_id}_prompt")
+            prompt2 = ChatPromptTemplate.from_template(prompt2_str)
 
             try:
-                final_text = await model.generate_gemini(
-                    prompt=prompt2,
-                    max_tokens=512,
-                    temperature=0.3,
+                llm = init_chat_model(
+                    model="gpt-4o-mini",
+                    max_tokens = 512,
+                    temperature = 0.3
                 )
+
+                answer_chain = (
+                    prompt2
+                    | llm
+                    | StrOutputParser()
+                )
+
+                final_text = await answer_chain.ainvoke({
+                    "question": question,
+                    "til": state.til,
+                    "level": state.level,
+                    "context": context,
+                })
 
                 final_text = self.delete_blank(final_text)
                 
@@ -180,19 +200,30 @@ class QAFlow:
             f"Q: {item.question}\nA: {item.answer}" for item in merged
         )
 
-        prompt3 = self.templates.summary.format(
-            qacombined = qacombined
-        )
+        prompt3_str = self.templates.summary
+        prompt3 = ChatPromptTemplate.from_template(prompt3_str)
 
         last_valid = None
 
         for attempt in range(3):
             try:
-                final_text = await model.generate_gemini(
-                    prompt=prompt3,
-                    max_tokens=32,
-                    temperature=0.3
+
+                llm = init_chat_model(
+                    model="gpt-4o-mini",
+                    max_tokens = 32,
+                    temperature = 0.3
                 )
+
+                summary_chain = (
+                    prompt3
+                    | llm
+                    | StrOutputParser()
+                )
+
+                final_text = await summary_chain.ainvoke({
+                    "qacombined": qacombined
+                })
+
 
                 final_text = self.delete_blank(final_text).strip()
 
@@ -222,7 +253,6 @@ class QAFlow:
             "content": merged
         }
         
-
     def build_graph(self):
         workflow = StateGraph(QAState)
 

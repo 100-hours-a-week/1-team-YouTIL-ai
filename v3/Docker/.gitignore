@@ -1,5 +1,5 @@
 # Python
-**/__pycache__/
+__pycache__/
 *.py[cod]
 *.egg-info/
 
@@ -13,6 +13,4 @@
 # 시스템
 .DS_Store
 
-/app/Docker/grafana/
-
-/home/yuri011228/1-team-YouTIL-ai/venv
+grafana/
