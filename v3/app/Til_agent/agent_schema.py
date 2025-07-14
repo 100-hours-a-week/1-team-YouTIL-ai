@@ -15,6 +15,7 @@ class InputSchema(BaseModel):
     branch: str = Field(description="GitHub 커밋 레포지토리 브랜치")
     sha_list: List[str] = Field(description="GitHub 커밋 레포지토리 브랜치의 커밋 해시 리스트")
     kafka_request: Optional[MessageRequest] = None
+    githubToken: str = Field(description="GitHub Access 토큰")
 #=====================================Commit Analysis Schema================================================
 class PatchSchema(BaseModel):
     commit_message:str = Field(description="GitHub 커밋 메시지")

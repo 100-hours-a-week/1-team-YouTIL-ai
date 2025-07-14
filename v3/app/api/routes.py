@@ -18,7 +18,9 @@ from app.Til_agent.commit_analysis_tools import CommitTools
 
 import uuid
 from langfuse.langchain import CallbackHandler
-from langfuse import get_client, Langfuse
+from langfuse import get_client
+from Crypto.Cipher import AES
+import base64
 
 #=====================================Interview=====================================#
 from app.prompts.Interview_Prompts import PromptTemplates
@@ -46,6 +48,9 @@ get_commit_data = CommitTools.get_commit_data
 # 비동기 Discord 클라이언트 실행
 asyncio.create_task(discord_client.start(os.getenv("DISCORD_BOT_TOKEN")))
 
+def unpad(s: bytes) -> bytes:
+    return s[:-s[-1]]
+
 # Til 평가 DB 연결 정보
 connection_info = {
     "host": os.getenv("DB_SERVER_IP"),
@@ -53,6 +58,7 @@ connection_info = {
     "password": os.getenv("MYSQL_DB_PW"),
     "database": "til_db"
 }
+
 
 
 
@@ -79,14 +85,29 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
 async def commit_analysis(state: InputSchema):
     username = state.owner
     date = state.date
-    repo = state.repo  
+    repo = state.repo
+    github_token = state.githubToken
+
+
+    key = os.getenv("GITHUB_PASSWORD_KEY").encode()
+    encrypted_b64 = github_token
+    cipher_bytes = base64.b64decode(encrypted_b64)
+
+    cipher = AES.new(key, AES.MODE_ECB)
+    decrypted_bytes = cipher.decrypt(cipher_bytes)
+
+    try:
+        decrypted = unpad(decrypted_bytes).decode('utf-8')
+    except Exception as e:
+        print("❌ 복호화 실패:", e)
 
     try:
         commit_data = get_commit_data(
             owner=state.owner, 
             repo=state.repo, 
             branch=state.branch, 
-            sha_list=state.sha_list
+            sha_list=state.sha_list,
+            github_token=decrypted
         )
         
         if state.kafka_request is not None:

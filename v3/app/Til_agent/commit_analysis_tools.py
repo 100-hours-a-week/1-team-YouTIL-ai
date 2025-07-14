@@ -8,7 +8,7 @@ load_dotenv()
 github_token = os.getenv("GITHUB_ACCESS_TOKEN")
 
 class CommitTools:
-    def get_commit_data(owner:str, repo:str, sha_list:list, branch: str) -> dict:
+    def get_commit_data(owner:str, repo:str, sha_list:list, branch: str, github_token: str) -> dict:
         """
     GitHub에서 특정 커밋들의 변경 파일과 패치 내용을 가져오는 도구입니다.
 
@@ -34,7 +34,6 @@ class CommitTools:
             - patched_code: patch가 적용된 최신 코드
         """
 
-        github_token = os.getenv("GITHUB_ACCESS_TOKEN")
         headers = {'Authorization':  f"Bearer {github_token}"}
         input_files = {
             'username':owner, 
