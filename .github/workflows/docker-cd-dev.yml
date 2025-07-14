@@ -33,4 +33,6 @@ jobs:
             docker run -d --name youtil-ai-dev \
               -p 8000:8000 \
               ${{ env.IMAGE_TAG }}
+
+            docker image prune -af
           EOF
