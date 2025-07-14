@@ -1,5 +1,4 @@
 import os
-import asyncio
 from langgraph.graph import END, StateGraph, START
 from langchain_core.tools import BaseTool
 from langchain_core.runnables import RunnableConfig
@@ -8,7 +7,7 @@ from .config import MultiAgentConfiguration
 from typing import cast, Literal
 from langchain_core.tools import tool
 from .utils import get_config_value
-
+from langfuse import observe
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from .agent_schema import (
@@ -27,8 +26,7 @@ from .prompt import SUPERVISOR_INSTRUCTIONS, INSTRUCTION_WRITER_INSTRUCTIONS
 from .research_team_agent import research_builder, get_search_tool
 from .commit_analyze_graph import CommitAnalysisGraph
 
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.env"))
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0,)
 
@@ -44,6 +42,11 @@ async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
     # tools.extend(mcp_tools)
     return tools
 
+@observe(
+    name="supervisor",
+    # capture_input=lambda state, **_: {"msg_len": len(state["messages"])},
+    # capture_output=lambda res: {"tool_calls": len(res["messages"][0].tool_calls)},
+)
 async def supervisor(state: TilState, config: RunnableConfig):
     """LLM decides whether to call a tool or not"""
 
@@ -100,6 +103,15 @@ async def supervisor(state: TilState, config: RunnableConfig):
         ]
     }
 
+@observe(
+    name="supervisor_tools",
+    # capture_input=lambda state, **_: {
+    #     "pending": len(state.get("sections", [])) -
+    #                len(state.get("completed_sections", []))
+    # },
+    # # 결과는 길 수 있으니 저장하지 않음
+    # capture_output=None
+)
 async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[Literal["supervisor", "research_team", "__end__"]]:
     """도구 호출을 수행하고 research_team 에게 전달합니다."""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
@@ -225,6 +237,11 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
 
     return Command(goto="supervisor", update=state_update)
 
+@observe(
+    name="supervisor_should_continue",
+    # capture_input=lambda state, **_: {"last_tool": state['messages'][-1].tool_calls[0]["name"] if state['messages'][-1].tool_calls else "none"},
+    # capture_output=None
+)
 async def supervisor_should_continue(state: TilState) -> str:
     """LLM이 도구 호출을 했는지 여부에 따라 루프를 계속할지 중지할지 결정합니다"""
 
