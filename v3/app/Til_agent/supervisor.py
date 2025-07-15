@@ -59,10 +59,6 @@ async def supervisor(state: TilState, config: RunnableConfig):
 
     # Initialize the model
     llm = ChatOpenAI(model=supervisor_model)
-
-    if state.get("messages") is None:
-        kafka_produce(state["kafka_request"], "SUPERVISOR_START")
-
     
     # If sections have been completed, but we don't yet have the final report, then we need to initiate writing the introduction and conclusion
     if state.get("completed_sections") and not state.get("final_report"):
@@ -116,9 +112,17 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     """도구 호출을 수행하고 research_team 에게 전달합니다."""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
 
+    is_first_supervisor = (
+    not state.get("completed_sections") and
+    not state.get("final_report") and
+    not state.get("concept")
+    )
+
+    if state["requestId"] is not None and is_first_supervisor:
+        kafka_produce(state["requestId"], "SUPERVISOR_START")
+
 
     result = []
-    sections_list = []
     intro_content = None
     conclusion_content = None
     concept_content = None
@@ -151,7 +155,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
                        "tool_call_id": tool_call["id"]})
 
         if tool_call["name"] == "Sections":
-            # sections_list = cast(Sections, observation).sections
             print("[Sections tool called] Ignored; using state.sections instead.")
         elif tool_call["name"] == "Concept":
             # Format introduction with proper H1 heading if not already formatted
@@ -184,8 +187,8 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     ]
 
     if pending_sections:
-        if state["kafka_request"] is not None:
-            kafka_produce(state["kafka_request"], "RESEARCH_TEAM_START")
+        if state["requestId"] is not None:
+            kafka_produce(state["requestId"], "RESEARCH_TEAM_START")
         return Command(
             goto=[
                 Send("research_team", {"section": s.dict() if isinstance(s, BaseModel) else s})
@@ -201,26 +204,25 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             "messages": result,
         }
     elif intro_content:
-        if state["kafka_request"] is not None:
-            kafka_produce(state["kafka_request"], "INTRODUCTION_START")
-        # Store introduction while waiting for conclusion
-        # Append to messages to guide the LLM to write conclusion next
+        if state["requestId"] is not None:
+            kafka_produce(state["requestId"], "INTRODUCTION_START")
+        # Introduction 작성 완료 메시지 추가
         result.append({"role": "user", "content": "Introduction 작성이 완료되었습니다. 이제 결론 부분을 작성합니다."})
         state_update = {
             "final_report": intro_content,
             "messages": result,
         }
     elif conclusion_content:
-        if state["kafka_request"] is not None:
-            kafka_produce(state["kafka_request"], "CONCLUSION_START")
-        # Get all sections and combine in proper order: Introduction, Body Sections, Conclusion
+        if state["requestId"] is not None:
+            kafka_produce(state["requestId"], "CONCLUSION_START")
+        # 모든 섹션을 올바른 순서로 결합: Introduction, Body Sections, Conclusion
         intro = state.get("final_report", "")
         body_sections = "\n\n".join(f"# {s.filename}\n\n{s.commit_report}\n---" for s in state["completed_sections"])
         
-        # Assemble final report in correct order
+        # 최종 보고서 조합
         complete_report = f"# 📅 {state.get('date', '')} TIL\n\n{intro}\n\n{body_sections}\n# 회고\n{conclusion_content}"
         
-        # Append to messages to indicate completion
+        # 완료 메시지 추가
         result.append({"role": "user", "content": "TIL(Today I Leared)의 개요, 본문 섹션, 회고 부분이 작성 완료되었습니다."})
 
         state_update = {
@@ -228,10 +230,10 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
             "messages": result,
         }
     else:
-        # Default case (for search tools, etc.)
+        # 기본 케이스 (검색 도구 등)
         state_update = {"messages": result}
 
-    # Include source string for evaluation
+    # 소스 문자열 포함 평가
     if configurable.include_source_str and source_str:
         state_update["source_str"] = source_str
 
@@ -247,12 +249,12 @@ async def supervisor_should_continue(state: TilState) -> str:
 
     messages = state["messages"]
     last_message = messages[-1]
-    # End because the supervisor asked a question or is finished
+    # 종료 조건
     if not last_message.tool_calls or (len(last_message.tool_calls) == 1 and last_message.tool_calls[0]["name"] == "FinishReport"):
-        # Exit the graph
+        # 그래프 종료
         return END
 
-    # If the LLM makes a tool call, then perform an action
+    # LLM이 도구 호출을 하면 동작 수행
     return "supervisor_tools"
 
 # Supervisor workflow

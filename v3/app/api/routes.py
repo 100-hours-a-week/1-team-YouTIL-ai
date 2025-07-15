@@ -83,6 +83,7 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
 
 @router.post("/til")
 async def commit_analysis(state: InputSchema):
+    print(state)
     username = state.owner
     date = state.date
     repo = state.repo
@@ -110,23 +111,23 @@ async def commit_analysis(state: InputSchema):
             github_token=decrypted
         )
         
-        if state.kafka_request is not None:
+        if state.requestId is not None:
             kafka_produce(
-                message=state.kafka_request, 
+                requestid=state.requestId, 
                 process="GET_COMMIT_DATA_FROM_GITHUB"
             )
         
         input_commit = CommitDataSchema(**commit_data)
         no_files = len(input_commit.files)
 
-        if state.kafka_request is not None:
+        if state.requestId is not None:
             kafka_produce(
-                message=state.kafka_request, 
+                requestid=state.requestId, 
                 process="COMMIT_ANALYSIS_START"
             )
         
         graph = await SupervisorGraph(no_files=no_files).make_supervisor_graph()
-        input_commit.kafka_request = state.kafka_request
+        input_commit.requestId = state.requestId
 
 
         session_id = str(uuid.uuid4())

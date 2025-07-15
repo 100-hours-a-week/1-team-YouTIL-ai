@@ -3,10 +3,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Annotated
 from langgraph.graph import MessagesState
 
-#=====================================Kafka Schema==========================================================
-class MessageRequest(BaseModel):
-    requestId: str
-    process: Optional[str] = None
+
 #=====================================Input Schema==========================================================
 class InputSchema(BaseModel):
     owner: str = Field(description="GitHub 커밋 레포지토리 소유자")
@@ -14,7 +11,7 @@ class InputSchema(BaseModel):
     date: Optional[str] = Field(default=None, description="GitHub 커밋 레포지토리 브랜치의 커밋 날짜")
     branch: str = Field(description="GitHub 커밋 레포지토리 브랜치")
     sha_list: List[str] = Field(description="GitHub 커밋 레포지토리 브랜치의 커밋 해시 리스트")
-    kafka_request: Optional[MessageRequest] = None
+    requestId: Optional[str] = Field(default=None, description="Kafka 요청 ID")
     githubToken: str = Field(description="GitHub Access 토큰")
 #=====================================Commit Analysis Schema================================================
 class PatchSchema(BaseModel):
@@ -40,7 +37,7 @@ class CommitDataSchema(BaseModel):
     files: Annotated[List[FileSchema], "파일별 커밋 정보, summary 포함"]
     commit_report: Optional[str] = None
     sections: Annotated[Optional[List[CommitAnalysisSchema]], operator.add] = Field(default=None, description="커밋 분석 결과 리스트") 
-    kafka_request: Optional[MessageRequest] = None
+    requestId: Optional[str] = Field(default=None, description="Kafka 요청 ID")
 
 class CommitAnalysisResults(BaseModel):
     commit_analysis: Annotated[List[CommitAnalysisSchema], operator.add] = Field(
@@ -129,7 +126,7 @@ class TilState(MessagesState):
     final_report: str # Final report
     keywords: List[str] # Keywords
     concept: str # Concept
-    kafka_request: MessageRequest
+    requestId: Optional[str] = Field(default=None, description="Kafka 요청 ID")
     # for evaluation purposes only
     # this is included only if configurable.include_source_str is True
     source_str: Annotated[str, operator.add] # String of formatted source content from web search
