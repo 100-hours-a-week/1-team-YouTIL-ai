@@ -112,6 +112,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     """도구 호출을 수행하고 research_team 에게 전달합니다."""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
 
+    # 첫 번째 supervisor 호출 확인
     is_first_supervisor = (
     not state.get("completed_sections") and
     not state.get("final_report") and
