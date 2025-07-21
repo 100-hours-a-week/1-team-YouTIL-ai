@@ -1,14 +1,9 @@
 from datetime import datetime
 import os
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-
-github_token = os.getenv("GITHUB_ACCESS_TOKEN")
 
 class CommitTools:
-    def get_commit_data(owner:str, repo:str, sha_list:list, branch: str, github_token: str) -> dict:
+    async def get_commit_data(owner:str, repo:str, sha_list:list, branch: str, github_token: str) -> dict:
         """
     GitHub에서 특정 커밋들의 변경 파일과 패치 내용을 가져오는 도구입니다.
 
@@ -33,18 +28,19 @@ class CommitTools:
             - status: 변경 상태 (added, modified, removed 등)
             - patched_code: patch가 적용된 최신 코드
         """
+        print(github_token)
+        headers = {
+            "Authorization": f"Bearer {github_token}",
+            "Accept": "application/vnd.github+json"
+        }
 
-        headers = {'Authorization':  f"Bearer {github_token}"}
-        input_files = {
-            'username':owner, 
-            'repo': repo,  
-            "branch": branch
-                }
+        print(headers)
+
         files_by_path = {}  # filepath 기준 정리
 
         for i, sha in enumerate(sha_list):
             commit_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{sha}"
-            response = requests.get(commit_url, headers=headers, timeout=30)
+            response = requests.get(commit_url, headers=headers, timeout=60)
             response.raise_for_status()
             response = response.json()
 

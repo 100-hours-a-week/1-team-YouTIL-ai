@@ -41,7 +41,7 @@ class MultiAgentConfiguration:
     
     # Multi-agent specific configuration
     number_of_queries: int = 2 # Number of search queries to generate per section
-    code_analysis_model: str = "gpt-4o-mini"
+    code_analysis_model: str = "claude-3-5-haiku-20241022"
     supervisor_model: str = "gpt-4o-mini"
     researcher_model: str = "gpt-4o-mini"
     ask_for_clarification: bool = False # Whether to ask for clarification from the user
