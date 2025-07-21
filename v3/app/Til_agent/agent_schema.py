@@ -16,7 +16,7 @@ class InputSchema(BaseModel):
 #=====================================Commit Analysis Schema================================================
 class PatchSchema(BaseModel):
     commit_message:str = Field(description="GitHub 커밋 메시지")
-    patch:str = Field(description="커밋된 코드 변경 사항")
+    patch: Optional[str] = Field(default=None, description="커밋된 코드 변경 사항")
 
 class FileSchema(BaseModel):
     filepath:str = Field(description="커밋된 파일 이름(디렉토리 경로 포함)")
