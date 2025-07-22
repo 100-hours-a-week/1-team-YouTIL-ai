@@ -28,7 +28,6 @@ from langfuse.langchain import CallbackHandler
 
 load_dotenv()
 
-model = ChatOpenAI(model="gpt-4o-mini", temperature=0,)
 
 async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
     """config에 따라 도구를 가져옵니다"""
