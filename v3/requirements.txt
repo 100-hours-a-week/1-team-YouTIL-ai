@@ -43,7 +43,6 @@ fqdn==1.5.1
 frozenlist==1.7.0
 fsspec==2025.3.0
 google==3.0.0
-google-ai-generativelanguage==0.6.15
 google-api-core==2.25.1
 google-api-python-client==2.176.0
 google-auth==2.40.3
@@ -90,9 +89,8 @@ jupyterlab_server==2.27.3
 kiwisolver==1.4.8
 langchain==0.3.25
 langchain-anthropic==0.3.17
-langchain-google-genai==2.1.8
 langchain-community==0.3.25
-langchain-core==0.3.65
+langchain-core==0.3.68
 langchain-openai==0.2.1
 langchain-text-splitters==0.3.8
 langfuse==3.1.3
