@@ -83,7 +83,6 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
 
 @router.post("/til")
 async def commit_analysis(state: InputSchema):
-    print(state)
     username = state.owner
     date = state.date
     repo = state.repo
@@ -103,7 +102,7 @@ async def commit_analysis(state: InputSchema):
         print("❌ 복호화 실패:", e)
 
     try:
-        commit_data = get_commit_data(
+        commit_data = await get_commit_data(
             owner=state.owner, 
             repo=state.repo, 
             branch=state.branch, 

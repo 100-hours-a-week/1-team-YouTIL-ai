@@ -7,7 +7,6 @@ from .config import MultiAgentConfiguration
 from typing import cast, Literal
 from langchain_core.tools import tool
 from .utils import get_config_value
-from langfuse import observe
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from .agent_schema import (
@@ -25,47 +24,31 @@ from .utils import kafka_produce
 from .prompt import SUPERVISOR_INSTRUCTIONS, INSTRUCTION_WRITER_INSTRUCTIONS
 from .research_team_agent import research_builder, get_search_tool
 from .commit_analyze_graph import CommitAnalysisGraph
+from langfuse.langchain import CallbackHandler
 
 load_dotenv()
 
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0,)
 
 async def get_supervisor_tools(config: RunnableConfig) -> list[BaseTool]:
-    """Get supervisor tools based on configuration"""
-    configurable = MultiAgentConfiguration.from_runnable_config(config)
-    search_tool = await get_search_tool(config)
+    """config에 따라 도구를 가져옵니다"""
     tools = [tool(Sections), tool(Introduction), tool(Conclusion), tool(FinishReport), tool(Concept)]
-    # if search_tool is not None:
-    #     tools.append(search_tool)  # Add search tool, if available
-    # existing_tool_names = {cast(BaseTool, tool).name for tool in tools}
-    # mcp_tools = await _load_mcp_tools(config, existing_tool_names)
-    # tools.extend(mcp_tools)
     return tools
 
-@observe(
-    name="supervisor",
-    # capture_input=lambda state, **_: {"msg_len": len(state["messages"])},
-    # capture_output=lambda res: {"tool_calls": len(res["messages"][0].tool_calls)},
-)
 async def supervisor(state: TilState, config: RunnableConfig):
-    """LLM decides whether to call a tool or not"""
+    """LLM이 도구를 호출할지 여부를 결정합니다"""
 
-    # Messages
     messages = state["messages"]
 
-    # Get configuration
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     supervisor_model = get_config_value(configurable.supervisor_model)
 
-    # Initialize the model
     llm = ChatOpenAI(model=supervisor_model)
     
-    # If sections have been completed, but we don't yet have the final report, then we need to initiate writing the introduction and conclusion
     if state.get("completed_sections") and not state.get("final_report"):
         research_complete_message = {"role": "user", "content": "연구가 완료되었습니다. 이제 Concept, Introduction, Conclusion을 작성하세요. 완성된 본문 섹션은 다음과 같습니다 \n\n" + "\n\n".join([s.commit_report for s in state["completed_sections"]])}
         messages = messages + [research_complete_message]
 
-    # Get tools based on configuration
     supervisor_tool_list = await get_supervisor_tools(config)
     
     
@@ -74,17 +57,13 @@ async def supervisor(state: TilState, config: RunnableConfig):
         .bind_tools(
             supervisor_tool_list,
             parallel_tool_calls=False,
-            # force at least one tool call
+            # 적어도 한개의 도구 호출을 강제합니다
             tool_choice="any"
         )
     )
 
-    # Get system prompt
     system_prompt = SUPERVISOR_INSTRUCTIONS
-    # if configurable.mcp_prompt:
-    #     system_prompt += f"\n\n{configurable.mcp_prompt}"
 
-    # Invoke
     return {
         "messages": [
             await llm_with_tools.ainvoke(
@@ -99,19 +78,11 @@ async def supervisor(state: TilState, config: RunnableConfig):
         ]
     }
 
-@observe(
-    name="supervisor_tools",
-    # capture_input=lambda state, **_: {
-    #     "pending": len(state.get("sections", [])) -
-    #                len(state.get("completed_sections", []))
-    # },
-    # # 결과는 길 수 있으니 저장하지 않음
-    # capture_output=None
-)
 async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[Literal["supervisor", "research_team", "__end__"]]:
     """도구 호출을 수행하고 research_team 에게 전달합니다."""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
 
+    # 첫 번째 supervisor 호출 확인
     is_first_supervisor = (
     not state.get("completed_sections") and
     not state.get("final_report") and
@@ -129,7 +100,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     concept_keywords = []
     source_str = ""
 
-    # Get tools based on configuration
     supervisor_tool_list = await get_supervisor_tools(config)
     supervisor_tools_by_name = {tool.name: tool for tool in supervisor_tool_list}
     search_tool_names = {
@@ -138,17 +108,13 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         if tool.metadata is not None and tool.metadata.get("type") == "search"
     }
 
-    # First process all tool calls to ensure we respond to each one (required for OpenAI)
     for tool_call in state["messages"][-1].tool_calls:
-        # Get the tool
         tool = supervisor_tools_by_name[tool_call["name"]]
-        # Perform the tool call - use ainvoke for async tools
         try:
             observation = await tool.ainvoke(tool_call["args"], config)
         except NotImplementedError:
             observation = tool.invoke(tool_call["args"], config)
 
-        # Append to messages 
         result.append({"role": "tool", 
                        "content": observation, 
                        "name": tool_call["name"], 
@@ -157,16 +123,13 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         if tool_call["name"] == "Sections":
             print("[Sections tool called] Ignored; using state.sections instead.")
         elif tool_call["name"] == "Concept":
-            # Format introduction with proper H1 heading if not already formatted
             observation = cast(Concept, observation)
             concept_content = observation.concept
             concept_keywords = observation.keywords
         elif tool_call["name"] == "Introduction":
-            # Format introduction with proper H1 heading if not already formatted
             observation = cast(Introduction, observation)
             intro_content = observation.content
         elif tool_call["name"] == "Conclusion":
-            # Format conclusion with proper H2 heading if not already formatted
             observation = cast(Conclusion, observation)
             if not observation.content.startswith("## "):
                 conclusion_content = f"{observation.content}"
@@ -175,7 +138,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         elif tool_call["name"] in search_tool_names and configurable.include_source_str:
             source_str += cast(str, observation)
 
-    # 완료된 filename 목록 만들기
     completed_filenames = {
         os.path.basename(s["filename"] if isinstance(s, dict) else s.filename)
         for s in state.get("completed_sections", [])
@@ -206,7 +168,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     elif intro_content:
         if state["requestId"] is not None:
             kafka_produce(state["requestId"], "INTRODUCTION_START")
-        # Introduction 작성 완료 메시지 추가
         result.append({"role": "user", "content": "Introduction 작성이 완료되었습니다. 이제 결론 부분을 작성합니다."})
         state_update = {
             "final_report": intro_content,
@@ -215,7 +176,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
     elif conclusion_content:
         if state["requestId"] is not None:
             kafka_produce(state["requestId"], "CONCLUSION_START")
-        # 모든 섹션을 올바른 순서로 결합: Introduction, Body Sections, Conclusion
         intro = state.get("final_report", "")
         body_sections = "\n\n".join(f"# {s.filename}\n\n{s.commit_report}\n---" for s in state["completed_sections"])
         
@@ -239,11 +199,6 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
 
     return Command(goto="supervisor", update=state_update)
 
-@observe(
-    name="supervisor_should_continue",
-    # capture_input=lambda state, **_: {"last_tool": state['messages'][-1].tool_calls[0]["name"] if state['messages'][-1].tool_calls else "none"},
-    # capture_output=None
-)
 async def supervisor_should_continue(state: TilState) -> str:
     """LLM이 도구 호출을 했는지 여부에 따라 루프를 계속할지 중지할지 결정합니다"""
 
@@ -262,6 +217,7 @@ class SupervisorGraph:
     def __init__(self, no_files: int):
         self.no_files = no_files
         self.commit_analysis_graph = CommitAnalysisGraph(no_files=no_files).make_commit_analysis_graph()
+        self.langfuse_handler = CallbackHandler()
 
     async def make_supervisor_graph(self):
         supervisor_builder = StateGraph(input=CommitDataSchema, output=TilStateOutput, config_schema=MultiAgentConfiguration)
@@ -280,6 +236,10 @@ class SupervisorGraph:
         )
         supervisor_builder.add_edge("research_team", "supervisor")
 
-        graph = supervisor_builder.compile()
+        graph = supervisor_builder.compile().with_config(
+            config={
+                "handlers": [self.langfuse_handler]
+            }
+        )
 
         return graph
