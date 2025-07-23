@@ -1,8 +1,7 @@
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, START, END
-from langchain_openai import ChatOpenAI
-from langchain.chat_models import init_chat_model
+from langchain_openai import AzureChatOpenAI
 from .agent_schema import (
     CommitDataSchema,
     CommitAnalysisSchema,
@@ -12,8 +11,10 @@ from langchain_core.runnables import RunnableConfig
 from .config import MultiAgentConfiguration
 from .prompt import COMMIT_REVIEW_INSTRUCTIONS
 from .utils import get_config_value
+from dotenv import load_dotenv
 import os
 
+load_dotenv()
 
 class CommitAnalysisGraph:
     def __init__(self, no_files: int):
@@ -33,10 +34,19 @@ class CommitAnalysisGraph:
     @staticmethod
     def make_code_summary_node(node_id: int):
 
-        async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitDataSchema:
-            configurable = MultiAgentConfiguration.from_runnable_config(config)
-            model = get_config_value(configurable.code_analysis_model)
-            llm = init_chat_model(model)
+        async def summarize_code(state:CommitDataSchema) -> CommitDataSchema:
+
+            llm = AzureChatOpenAI(
+                azure_deployment="gpt-35-turbo",  
+                api_version="2024-12-01-preview",
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                temperature=0,
+                max_tokens=2048,
+                timeout=30,
+                max_retries=2,
+            )
+
+
             files = state.files
             system_prompt = COMMIT_REVIEW_INSTRUCTIONS
             user_prompt = """[file name]: {file_name}
