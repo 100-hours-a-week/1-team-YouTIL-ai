@@ -1,9 +1,7 @@
-from langfuse import observe
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, START, END
-from langchain_openai import ChatOpenAI
-from langchain.chat_models import init_chat_model
+from langchain_openai import AzureChatOpenAI
 from .agent_schema import (
     CommitDataSchema,
     CommitAnalysisSchema,
@@ -13,19 +11,16 @@ from langchain_core.runnables import RunnableConfig
 from .config import MultiAgentConfiguration
 from .prompt import COMMIT_REVIEW_INSTRUCTIONS
 from .utils import get_config_value
+from dotenv import load_dotenv
 import os
 
+load_dotenv()
 
 class CommitAnalysisGraph:
     def __init__(self, no_files: int):
         self.no_files = no_files
 
     @staticmethod
-    @observe(
-        name="fork_files_nodes",
-        # capture_input=lambda state: {"file_count": len(state.files)},
-        # capture_output=lambda result: {"forked_file_ids": [f.node_id for f in result["files"]]},
-    )
     async def fork_files_nodes(state: CommitDataSchema) -> dict:
         files = state.files
         for idx, file in enumerate(files):
@@ -38,17 +33,20 @@ class CommitAnalysisGraph:
     ## code analysis nodes
     @staticmethod
     def make_code_summary_node(node_id: int):
-        @observe(
-            name=f"summarize_code_node_{node_id}",
-            # capture_input=lambda state, config: {
-            #     "file": next((f.filepath for f in state.files if f.node_id == node_id), "N/A")
-            # },
-            # capture_output=lambda result: {"summary_snippet": result["sections"][0].code_review[:200]},
-        )
-        async def summarize_code(state:CommitDataSchema, config: RunnableConfig) -> CommitDataSchema:
-            configurable = MultiAgentConfiguration.from_runnable_config(config)
-            model = get_config_value(configurable.code_analysis_model)
-            llm = init_chat_model(model)
+
+        async def summarize_code(state:CommitDataSchema) -> CommitDataSchema:
+
+            llm = AzureChatOpenAI(
+                azure_deployment="gpt-35-turbo",  
+                api_version="2024-12-01-preview",
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                temperature=0,
+                max_tokens=2048,
+                timeout=30,
+                max_retries=2,
+            )
+
+
             files = state.files
             system_prompt = COMMIT_REVIEW_INSTRUCTIONS
             user_prompt = """[file name]: {file_name}

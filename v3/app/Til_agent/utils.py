@@ -1,5 +1,4 @@
 from typing import Optional, Dict, Any
-from .agent_schema import MessageRequest
 from confluent_kafka import Producer
 import json
 import os
@@ -53,7 +52,7 @@ def get_today_str() -> str:
     """Get current date in a human-readable format."""
     return datetime.datetime.now().strftime("%Y.%m.%d")
 
-def kafka_produce(message: MessageRequest, process: str):
+def kafka_produce(requestid: str, process: str):
     """
     Kafka 메시지 전송
     """
@@ -62,13 +61,11 @@ def kafka_produce(message: MessageRequest, process: str):
 }
 
     producer = Producer(producer_conf)
-    message.process = process
+    
     try:
-        body_dict = message.dict()
-        body_json = json.dumps(body_dict)
-        producer.produce(topic=os.getenv("KAFKA_TOPIC"), key=message.requestId, value=message.process.encode("utf-8"))
+        producer.produce(topic=os.getenv("KAFKA_TOPIC"), key=requestid, value=process.encode("utf-8"))
         producer.flush()
-        return {"status": "sent", "message": message}
+        return {"status": "sent", "message": process}
     except Exception as e:
         logging.exception("Failed to send")
-        return {"status": "failed", "message": message}
+        return {"status": "failed", "message": process}

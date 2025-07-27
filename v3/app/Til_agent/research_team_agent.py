@@ -8,10 +8,12 @@ from typing import List, Annotated, Literal, cast
 from .utils import get_config_value
 from .config import MultiAgentConfiguration
 from .prompt import RESEARCH_INSTRUCTIONS
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langgraph.graph import StateGraph, START, END
+from dotenv import load_dotenv
 
-from langfuse import observe
+load_dotenv()
+
 from typing import Union
 from .agent_schema import (
     ReportState, 
@@ -292,7 +294,6 @@ async def google_search_async(search_queries: Union[str, List[str]], max_results
             executor.shutdown(wait=False)
 
 
-@observe(name="tavily_search_async")
 async def tavily_search_async(search_queries, max_results: int = 5, topic: Literal["general", "news", "finance"] = "general", include_raw_content: bool = True):
     """
     Tavily API를 사용하여 동시 웹 검색을 수행합니다.
@@ -424,32 +425,34 @@ async def get_research_tools(config: RunnableConfig) -> list[BaseTool]:
     search_tool = await get_search_tool(config)
     tools = [tool(SectionWriterInput), tool(CommitReportSchema), tool(FinishResearch)]
     if search_tool is not None:
-        tools.append(search_tool)  # Add search tool, if available
-    # existing_tool_names = {cast(BaseTool, tool).name for tool in tools}
+        tools.append(search_tool)
+
     return tools
 
-@observe(name="research_agent")
 async def research_agent(state: ReportState, config: RunnableConfig):
     """LLM이 도구를 호출할지 여부를 결정합니다"""
     commit_analysis_result = state["section"]
     
-    # Get configuration
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     researcher_model = get_config_value(configurable.researcher_model)
     
-    # Initialize the model
-    llm = ChatOpenAI(model=researcher_model, temperature=0)
+    llm = AzureChatOpenAI(
+        azure_deployment="gpt-4o-mini",  
+        api_version="2024-12-01-preview",
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        temperature=0,
+        max_tokens=2048,
+        timeout=30,
+        max_retries=2,
+    )
 
-    # Get tools based on configuration
     research_tool_list = await get_research_tools(config)
     system_prompt = RESEARCH_INSTRUCTIONS.format(
         code_review=commit_analysis_result["code_review"],
         number_of_query=configurable.number_of_queries,
     )
-    # if configurable.mcp_prompt:
-    #     system_prompt += f"\n\n{configurable.mcp_prompt}"
 
-    # Ensure we have at least one user message (required by Anthropic)
+
     messages = state.get("messages", [])
     if not messages:
         messages = [{"role": "user", "content": f"커밋 내용에 대한 웹검색을 수행하고 보고서를 작성해 주세요: {commit_analysis_result['code_review']}"}]
@@ -473,11 +476,6 @@ async def research_agent(state: ReportState, config: RunnableConfig):
         ]
     }
 
-@observe(
-    name="research_agent_tools",
-    # capture_input=lambda state, **_: {"tool_calls": len(state['messages'][-1].tool_calls)},
-    # capture_output=None
-)
 async def research_agent_tools(state: ReportState, config: RunnableConfig):
     """도구 호출을 수행하고 에이전트에게 전달하거나 연구 루프를 지속합니다"""
     configurable = MultiAgentConfiguration.from_runnable_config(config)
