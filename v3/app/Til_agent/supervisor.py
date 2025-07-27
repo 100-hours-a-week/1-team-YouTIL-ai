@@ -7,7 +7,7 @@ from .config import MultiAgentConfiguration
 from typing import cast, Literal
 from langchain_core.tools import tool
 from .utils import get_config_value
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from pydantic import BaseModel
 from .agent_schema import (
     CommitDataSchema,
@@ -42,7 +42,15 @@ async def supervisor(state: TilState, config: RunnableConfig):
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     supervisor_model = get_config_value(configurable.supervisor_model)
 
-    llm = ChatOpenAI(model=supervisor_model)
+    llm = AzureChatOpenAI(
+        azure_deployment="gpt-4o-mini",  
+        api_version="2024-12-01-preview",
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        temperature=0,
+        max_tokens=2048,
+        timeout=30,
+        max_retries=2,
+    )
     
     if state.get("completed_sections") and not state.get("final_report"):
         research_complete_message = {"role": "user", "content": "연구가 완료되었습니다. 이제 Concept, Introduction, Conclusion을 작성하세요. 완성된 본문 섹션은 다음과 같습니다 \n\n" + "\n\n".join([s.commit_report for s in state["completed_sections"]])}
@@ -176,7 +184,7 @@ async def supervisor_tools(state: TilState, config: RunnableConfig)  -> Command[
         if state["requestId"] is not None:
             kafka_produce(state["requestId"], "CONCLUSION_START")
         intro = state.get("final_report", "")
-        body_sections = "\n\n".join(f"# {s.filename}\n\n{s.commit_report}\n---" for s in state["completed_sections"])
+        body_sections = "\n\n".join(f"# {s.filename}\n\n{s.commit_report}\n\n---" for s in state["completed_sections"])
         
         # 최종 보고서 조합
         complete_report = f"# 📅 {state.get('date', '')} TIL\n\n{intro}\n\n{body_sections}\n# 회고\n{conclusion_content}"

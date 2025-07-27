@@ -8,8 +8,11 @@ from typing import List, Annotated, Literal, cast
 from .utils import get_config_value
 from .config import MultiAgentConfiguration
 from .prompt import RESEARCH_INSTRUCTIONS
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langgraph.graph import StateGraph, START, END
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from typing import Union
 from .agent_schema import (
@@ -433,7 +436,15 @@ async def research_agent(state: ReportState, config: RunnableConfig):
     configurable = MultiAgentConfiguration.from_runnable_config(config)
     researcher_model = get_config_value(configurable.researcher_model)
     
-    llm = ChatOpenAI(model=researcher_model, temperature=0)
+    llm = AzureChatOpenAI(
+        azure_deployment="gpt-4o-mini",  
+        api_version="2024-12-01-preview",
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        temperature=0,
+        max_tokens=2048,
+        timeout=30,
+        max_retries=2,
+    )
 
     research_tool_list = await get_research_tools(config)
     system_prompt = RESEARCH_INSTRUCTIONS.format(

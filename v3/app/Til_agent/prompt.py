@@ -176,103 +176,6 @@ RESEARCH_INSTRUCTIONS = """
 - 모든 응답은 한글로 작성하세요.
 """
 
-
-SUMMARIZATION_PROMPT = """You are tasked with summarizing the raw content of a webpage retrieved from a web search. Your goal is to create a concise summary that preserves the most important information from the original web page. This summary will be used by a downstream research agent, so it's crucial to maintain the key details without losing essential information.
-
-Here is the raw content of the webpage:
-
-<webpage_content>
-{webpage_content}
-</webpage_content>
-
-Please follow these guidelines to create your summary:
-
-1. Identify and preserve the main topic or purpose of the webpage.
-2. Retain key facts, statistics, and data points that are central to the content's message.
-3. Keep important quotes from credible sources or experts.
-4. Maintain the chronological order of events if the content is time-sensitive or historical.
-5. Preserve any lists or step-by-step instructions if present.
-6. Include relevant dates, names, and locations that are crucial to understanding the content.
-7. Summarize lengthy explanations while keeping the core message intact.
-
-When handling different types of content:
-
-- For news articles: Focus on the who, what, when, where, why, and how.
-- For scientific content: Preserve methodology, results, and conclusions.
-- For opinion pieces: Maintain the main arguments and supporting points.
-- For product pages: Keep key features, specifications, and unique selling points.
-
-Your summary should be significantly shorter than the original content but comprehensive enough to stand alone as a source of information. Aim for about 25-30% of the original length, unless the content is already concise.
-
-Present your summary in the following format:
-
-```
-{{
-   "summary": "Your concise summary here, structured with appropriate paragraphs or bullet points as needed",
-   "key_excerpts": [
-     "First important quote or excerpt",
-     "Second important quote or excerpt",
-     "Third important quote or excerpt",
-     ...Add more excerpts as needed, up to a maximum of 5
-   ]
-}}
-```
-
-Here are two examples of good summaries:
-
-Example 1 (for a news article):
-```json
-{{
-   "summary": "On July 15, 2023, NASA successfully launched the Artemis II mission from Kennedy Space Center. This marks the first crewed mission to the Moon since Apollo 17 in 1972. The four-person crew, led by Commander Jane Smith, will orbit the Moon for 10 days before returning to Earth. This mission is a crucial step in NASA's plans to establish a permanent human presence on the Moon by 2030.",
-   "key_excerpts": [
-     "Artemis II represents a new era in space exploration," said NASA Administrator John Doe.
-     "The mission will test critical systems for future long-duration stays on the Moon," explained Lead Engineer Sarah Johnson.
-     "We're not just going back to the Moon, we're going forward to the Moon," Commander Jane Smith stated during the pre-launch press conference.
-   ]
-}}
-```
-
-Example 2 (for a scientific article):
-```json
-{{
-   "summary": "A new study published in Nature Climate Change reveals that global sea levels are rising faster than previously thought. Researchers analyzed satellite data from 1993 to 2022 and found that the rate of sea-level rise has accelerated by 0.08 mm/year² over the past three decades. This acceleration is primarily attributed to melting ice sheets in Greenland and Antarctica. The study projects that if current trends continue, global sea levels could rise by up to 2 meters by 2100, posing significant risks to coastal communities worldwide.",
-   "key_excerpts": [
-      "Our findings indicate a clear acceleration in sea-level rise, which has significant implications for coastal planning and adaptation strategies," lead author Dr. Emily Brown stated.
-      "The rate of ice sheet melt in Greenland and Antarctica has tripled since the 1990s," the study reports.
-      "Without immediate and substantial reductions in greenhouse gas emissions, we are looking at potentially catastrophic sea-level rise by the end of this century," warned co-author Professor Michael Green.
-   ]
-}}
-```
-
-Remember, your goal is to create a summary that can be easily understood and utilized by a downstream research agent while preserving the most critical information from the original webpage."""
-
-QUERY_WRITER_INSTRUCTIONS="""당신은 Commit 보고서의 섹션을 작성하기 위해 포괄적인 정보를 수집하는 타겟팅된 웹 검색 쿼리를 작성하는 전문 기술 문서 작성자입니다.
-
-<commit summary>
-{commit_summary}
-</commit summary>
-
-<research keywords>
-{research_keywords}
-</research keywords>
-
-<Task>
-당신의 목표는 섹션 주제 위에 포괄적인 정보를 수집하는 데 도움이 되는 {number_of_queries} 검색 쿼리를 생성하는 것입니다.
-
-쿼리는 다음과 같아야 합니다:
-
-1. 커밋 요약과 관련이 있어야 합니다. 
-2. 기술적으로 기여가 있는 개념을 찾을 수 있도록 쿼리를 충분히 구체적으로 작성하세요.
-
-고품질의 관련성 높은 소스를 찾을 수 있도록 쿼리를 충분히 구체적으로 작성하세요.
-</Task>
-
-<output format>
-{number_of_queries}개의 쿼리를 생성하세요.
-['query1', 'query2', 'query3', ...]
-</output format>
-"""
-
 SECTION_WRITER_INSTRUCTIONS = """연구 보고서의 한 섹션을 작성합니다.
 
 <과제>
@@ -308,7 +211,7 @@ SECTION_WRITER_INSTRUCTIONS = """연구 보고서의 한 섹션을 작성합니�
 </Final Check>
 """
 
-COMMIT_REVIEW_INSTRUCTIONS = """당신은 커밋 리뷰를 기반으로 보고서를 작성하는 전문가인 AI 어시스턴트입니다. 아래에서 받은 커밋을 검토하세요. 
+COMMIT_REVIEW_INSTRUCTIONS = """당신은 커밋 데이터를 기반으로 리뷰 보고서를 작성하는 전문가인 AI 어시스턴트입니다. 아래에서 받은 커밋을 검토하세요. 
 
 <입력 형식>
 1. file name: 커밋이 반영된 파일의 이름이 확장자를 포함하여 주어집니다.
@@ -323,74 +226,112 @@ COMMIT_REVIEW_INSTRUCTIONS = """당신은 커밋 리뷰를 기반으로 보고�
 1. **사용된 언어, 라이브러리, 프레임워크 설명**: 코드에서 활용된 언어, 라이브러리, 프레임워크를 나열합니다.
 2. **명확한 답변**: code와 code_diff 외의 내용은 작성하지 마세요.
 3. **코드 변경 사항 중점 리뷰**: code_diff로 부터 변경된 부분을 중점적으로 리뷰하고, 전체 코드에 미치는 영향과 효과를 기술하세요.
-4. **적절한 코드 예시**: 주요한 코드 변경 사항은 코드 스니펫과 함께 변경된 주요 기능에 대한 설명을 포함하세요.
+4. **코드 개선 사항 및 개선점**: 코드에서 개선 사항과 개선점을 찾아서 기술하세요.
+5. **적절한 코드 예시**: 주요한 코드 변경 사항은 코드 스니펫과 함께 변경된 주요 기능에 대한 설명을 포함하세요.
+6. **리뷰 작성 형식의 마크다운 형식을 따르세요.**: 파일 이름의 헤더는 2레벨 헤더, 각 섹션의 헤더는 3레벨 헤더를 사용하세요.
 </code_review 규칙>
 
-<지시 사항>
-- 커밋이 반영된 코드와 변경된 코드 모두를 고려해야 합니다.
-- 출력 형식을 참고해서 작성해주세요.
-- 코드 변경 내용을 중점적으로 리뷰하세요.
-- 만약 필요하다면, 리뷰 과정에서 필요한 예시(코드 예시, 코드 변경 사항 예시)를 추가하세요.
-- code review는 보고서 형식으로 개조식으로 작성하세요.
-</지시 사항>
-
-<출력 형식>
-# [file name(확장자 포함)]
-
-- 언어: [언어]
-- 라이브러리: [라이브러리]
-- 프레임워크: [프레임워크]
-
-## 코드 개요
-- 전체 코드와 변경된 코드를 통해 알 수 있는 커밋의 목적이 드러날 수 있는 개요를 작성하세요.
-
-## 주요 변경 사항
-
-### 주요 변경에 대한 개념 설명
-- 변경된 코드 내용: [변경된 코드 내용]
-- 변경된 코드 내용에 대한 설명: [변경된 코드 내용에 대한 설명]
-
-### 주요 변경에 대한 개념 설명
-- 변경된 코드 내용: [변경된 코드 내용]
-- 변경된 코드 내용에 대한 설명: [변경된 코드 내용에 대한 설명]
-...
-</출력 형식>
-
-<출력 예시>
-# auth_service.py
-
-- 언어: Python  
-- 라이브러리: bcrypt, jwt  
-- 프레임워크: FastAPI  
-
-## 코드 개요
-- 본 커밋은 사용자 인증 기능을 강화하기 위해 비밀번호 해싱과 JWT 기반 액세스 토큰 발급 기능을 도입한 작업입니다. 이를 통해 인증 절차의 보안성과 유연성을 향상시키고자 하였습니다.
-
-## 주요 변경 사항
-
-### 비밀번호 해싱 기능 추가
-- 변경된 코드 내용:  
-```python
-  import bcrypt
-
-  def hash_password(password: str) -> str:
-      return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-```
-- 변경된 코드 내용에 대한 설명:  
-  사용자의 비밀번호를 해싱하여 안전하게 저장할 수 있도록 bcrypt 기반 해시 함수를 추가하였습니다. 이를 통해 비밀번호 평문 저장을 방지하고 보안을 강화할 수 있습니다.
-
-### JWT 기반 액세스 토큰 발급 기능 추가
-- 변경된 코드 내용:  
-```python
-  import jwt
-
-  def create_access_token(data: dict, secret_key: str) -> str:
-      return jwt.encode(data, secret_key, algorithm="HS256")
-```
-- 변경된 코드 내용에 대한 설명:  
-  사용자의 인증 정보를 담아 JWT 토큰을 생성하는 기능이 추가되었습니다. 이 기능을 통해 클라이언트는 서버에 인증된 상태로 요청을 지속할 수 있게 됩니다.
-</출력 예시>
+<리뷰 작성 형삭>
+## 파일 이름
+### 스타일: 코드의 스타일에 대해서 기술하세요.
+### 버그: 잠재적으로 발생할 수 있는 버그에 대해서 기술하세요.
+### 성능/구조: 코드의 성능과 구조에 대해서 기술하세요.
+### 보안: 코드의 보안에 대해서 기술하세요.
+### 코드 변경 분석:
+    - 변경 목적과 그 타당성
+    - 전체 구조나 모듈에 미치는 영향
+    - 성능/보안/버그 관점의 분석
+    - 개선 사항이 있다면 코드 예시와 함께 설명
+### 제안된 코드 개선 방안
+- 전체 코드에서 부분에서 개선해야 할 부분에 대한 설명을 적어주세요.
+- 필요시 코드 스니펫을 통해 개선해야 할 부분에 대한 설명을 추가하세요.
+- 코드 개선 사항은 최대 500단어로 작성하세요.
+</리뷰 작성 형식>
 """
+
+# COMMIT_REVIEW_INSTRUCTIONS = """당신은 커밋 리뷰를 기반으로 보고서를 작성하는 전문가인 AI 어시스턴트입니다. 아래에서 받은 커밋을 검토하세요. 
+
+# <입력 형식>
+# 1. file name: 커밋이 반영된 파일의 이름이 확장자를 포함하여 주어집니다.
+# 2. code: 커밋이 반영된 최신 코드가 주어집니다.
+# 3. patches: 커밋에 적용된 코드 변경 사항이 주어집니다.
+#     - '@'는 코드가 변경된 부분을 나타냅니다.
+#     - '@ +'는 코드가 추가된 부분을 나타냅니다.
+#     - '@ -'는 코드가 삭제된 부분을 나타냅니다.
+# </입력 형식>
+    
+# <code_review 규칙>
+# 1. **사용된 언어, 라이브러리, 프레임워크 설명**: 코드에서 활용된 언어, 라이브러리, 프레임워크를 나열합니다.
+# 2. **명확한 답변**: code와 code_diff 외의 내용은 작성하지 마세요.
+# 3. **코드 변경 사항 중점 리뷰**: code_diff로 부터 변경된 부분을 중점적으로 리뷰하고, 전체 코드에 미치는 영향과 효과를 기술하세요.
+# 4. **적절한 코드 예시**: 주요한 코드 변경 사항은 코드 스니펫과 함께 변경된 주요 기능에 대한 설명을 포함하세요.
+# </code_review 규칙>
+
+# <지시 사항>
+# - 커밋이 반영된 코드와 변경된 코드 모두를 고려해야 합니다.
+# - 출력 형식을 참고해서 작성해주세요.
+# - 코드 변경 내용을 중점적으로 리뷰하세요.
+# - 만약 필요하다면, 리뷰 과정에서 필요한 예시(코드 예시, 코드 변경 사항 예시)를 추가하세요.
+# - code review는 보고서 형식으로 개조식으로 작성하세요.
+# </지시 사항>
+
+# <출력 형식>
+# # [file name(확장자 포함)]
+
+# - 언어: [언어]
+# - 라이브러리: [라이브러리]
+# - 프레임워크: [프레임워크]
+
+# ## 코드 개요
+# - 전체 코드와 변경된 코드를 통해 알 수 있는 커밋의 목적이 드러날 수 있는 개요를 작성하세요.
+
+# ## 주요 변경 사항
+
+# ### 주요 변경에 대한 개념 설명
+# - 변경된 코드 내용: [변경된 코드 내용]
+# - 변경된 코드 내용에 대한 설명: [변경된 코드 내용에 대한 설명]
+
+# ### 주요 변경에 대한 개념 설명
+# - 변경된 코드 내용: [변경된 코드 내용]
+# - 변경된 코드 내용에 대한 설명: [변경된 코드 내용에 대한 설명]
+# ...
+# </출력 형식>
+
+# <출력 예시>
+# # auth_service.py
+
+# - 언어: Python  
+# - 라이브러리: bcrypt, jwt  
+# - 프레임워크: FastAPI  
+
+# ## 코드 개요
+# - 본 커밋은 사용자 인증 기능을 강화하기 위해 비밀번호 해싱과 JWT 기반 액세스 토큰 발급 기능을 도입한 작업입니다. 이를 통해 인증 절차의 보안성과 유연성을 향상시키고자 하였습니다.
+
+# ## 주요 변경 사항
+
+# ### 비밀번호 해싱 기능 추가
+# - 변경된 코드 내용:  
+# ```python
+#   import bcrypt
+
+#   def hash_password(password: str) -> str:
+#       return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+# ```
+# - 변경된 코드 내용에 대한 설명:  
+#   사용자의 비밀번호를 해싱하여 안전하게 저장할 수 있도록 bcrypt 기반 해시 함수를 추가하였습니다. 이를 통해 비밀번호 평문 저장을 방지하고 보안을 강화할 수 있습니다.
+
+# ### JWT 기반 액세스 토큰 발급 기능 추가
+# - 변경된 코드 내용:  
+# ```python
+#   import jwt
+
+#   def create_access_token(data: dict, secret_key: str) -> str:
+#       return jwt.encode(data, secret_key, algorithm="HS256")
+# ```
+# - 변경된 코드 내용에 대한 설명:  
+#   사용자의 인증 정보를 담아 JWT 토큰을 생성하는 기능이 추가되었습니다. 이 기능을 통해 클라이언트는 서버에 인증된 상태로 요청을 지속할 수 있게 됩니다.
+# </출력 예시>
+# """
 
 INSTRUCTION_WRITER_INSTRUCTIONS = """Concept 부분이 작성되었습니다. 이제 Introduction 부분을 작성합니다.
 아래 본문 내용을 참고하여 **작성자의 회고 스타일**로 오늘의 학습 개요를 작성해주세요.
