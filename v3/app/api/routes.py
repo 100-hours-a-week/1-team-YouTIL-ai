@@ -22,6 +22,10 @@ from langfuse import get_client
 from Crypto.Cipher import AES
 import base64
 
+#========================================Safety Filter========================================#
+from app.safety_filter.filter import SafeFilter
+from app.safety_filter.filter import ContentSchema
+
 #=====================================Interview=====================================#
 from app.prompts.Interview_Prompts import PromptTemplates
 from app.nodes.interview_langgraph_nodes import QAFlow
@@ -42,6 +46,8 @@ router = APIRouter()
 embedding_model = EmbeddingModel()
 discord_client = DiscordClient()
 discord_client_interview = DiscordClientInterview()
+
+safe_filter = SafeFilter()
 
 get_commit_data = CommitTools.get_commit_data
 
@@ -80,6 +86,13 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
             logger.warning("❌ 평가 결과를 파싱할 수 없어 DB 저장 생략")
     except Exception as e:
         logger.error(f"[TIL 평가 실패] {e}")
+
+@router.post("/filter")
+async def safety_filter(state: ContentSchema):
+    response = await safe_filter.content_filter(state)
+
+    result = {"result": response.filter_type}
+    return result
 
 @router.post("/til")
 async def commit_analysis(state: InputSchema):
