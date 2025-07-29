@@ -28,6 +28,7 @@ datasets==4.0.0
 debugpy==1.8.14
 decorator==5.2.1
 defusedxml==0.7.1
+unidiff==0.7.5
 dill==0.3.8
 discord==2.3.2
 discord.py==2.5.2
