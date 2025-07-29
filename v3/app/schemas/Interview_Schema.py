@@ -4,6 +4,7 @@ from typing import List, Optional
 class ContentState(BaseModel):
     question: str
     answer: str 
+    summary: Optional[str] = None
 
 class QAState(BaseModel):
     email: str

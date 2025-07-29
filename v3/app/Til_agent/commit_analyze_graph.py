@@ -7,6 +7,7 @@ from .agent_schema import (
     CommitAnalysisSchema,
     TilState
 )
+from unidiff import PatchSet
 from langchain_core.runnables import RunnableConfig
 from .config import MultiAgentConfiguration
 from .prompt import COMMIT_REVIEW_INSTRUCTIONS
@@ -15,6 +16,39 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
+
+def annotate_code_with_patch(latest_code: str, patch_text: str, filename: str) -> str:
+    # 유효한 patch 헤더 붙이기
+    if not patch_text.startswith('--- '):
+        patch_text = f"--- a/{filename}\n+++ b/{filename}\n" + patch_text
+
+    patch = PatchSet(patch_text)
+    code_lines = latest_code.splitlines()
+    annotated = code_lines.copy()
+
+    target_file = next((f for f in patch if f.path == filename or f.path.endswith(filename)), None)
+    if not target_file:
+        return latest_code  # 변경 없음
+
+    offset = 0
+    for hunk in target_file:
+        for line in hunk:
+            if line.is_added and line.target_line_no is not None:
+                idx = line.target_line_no - 1
+                # 줄 내용이 동일하면 주석만 덧붙이기
+                if idx < len(annotated) and annotated[idx].strip() == line.value.strip():
+                    annotated[idx] = "[+]" + annotated[idx].rstrip()  
+                else:
+                    # 삽입이 필요한 경우에만 insert
+                    annotated.insert(idx,"[+]" + line.value.rstrip())
+                offset += 1
+            # 삭제된 줄도 표시
+            elif line.is_removed:
+                idx = line.source_line_no - 1 + offset
+                annotated.insert(idx, f"[-] {line.value.rstrip()}")
+                offset += 1
+
+    return "\n".join(annotated)
 
 class CommitAnalysisGraph:
     def __init__(self, no_files: int):
@@ -51,9 +85,8 @@ class CommitAnalysisGraph:
             system_prompt = COMMIT_REVIEW_INSTRUCTIONS
             user_prompt = """[file name]: {file_name}
     --------------------------------
-    [code]: {code}
-    --------------------------------
-    [patches]: {patches}"""
+    [code with patches]: {code}
+    --------------------------------"""
             
             target_file = None
             for file in files:
@@ -63,12 +96,9 @@ class CommitAnalysisGraph:
             file_name = target_file.filepath
             code = target_file.latest_code
             patches = target_file.patches
-
-            for i, patch in enumerate(patches):
-                patches_str = f"[commit message {i+1}]: " + patch.commit_message + "\n"
-                patches_str += "[code diff]: \n"
-                patches_str += patch.patch + "\n"
-                patches_str += "--------------------------------"
+            patches_str = f"[commit message]: " + patches[0].commit_message + "\n"
+            patches_str += annotate_code_with_patch(code, patches[0].patch, file_name) + "\n"
+            patches_str += "--------------------------------"
 
             code_analysis_prompt = ChatPromptTemplate.from_messages(
                 [
@@ -86,8 +116,7 @@ class CommitAnalysisGraph:
             result: CommitAnalysisSchema = await code_analysis_chain.ainvoke(
                 {
                     "file_name": file_name, 
-                    "code": code, 
-                    "patches": patches_str
+                    "code": patches_str, 
                 }
             )
             

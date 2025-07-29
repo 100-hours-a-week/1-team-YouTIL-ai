@@ -28,4 +28,4 @@ ENV LANGFUSE_DISABLE_TELEMETRY=true
 EXPOSE 8000
 
 # 애플리케이션 실행
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "5"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
