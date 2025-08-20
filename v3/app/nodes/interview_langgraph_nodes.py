@@ -37,6 +37,12 @@ class QAFlow:
         lines = [line.strip() for line in text.split('\n') if line.strip()]
 
         return lines[0] if lines else ""
+    
+    def generate_all_question_node(self):
+        @traceable(name=f"전체 질문 생성 노드", run_type="llm")
+        async def all_question(state: QAState) -> dict:
+            prompt_str = getattr(self.templates, f"q")
+
 
     def generate_question_node(self, node_id: int):
         @traceable(name=f"질문 생성 노드 {node_id}", run_type="llm")

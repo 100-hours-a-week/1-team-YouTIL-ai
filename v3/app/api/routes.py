@@ -22,14 +22,20 @@ from langfuse import get_client
 from Crypto.Cipher import AES
 import base64
 
+#========================================Safety Filter========================================#
+from app.safety_filter.filter import SafeFilter
+from app.safety_filter.filter import ContentSchema
+
 #=====================================Interview=====================================#
 from app.prompts.Interview_Prompts import PromptTemplates
 from app.nodes.interview_langgraph_nodes import QAFlow
 from app.schemas.Interview_Schema import QAState
 from app.evaluation.interview_evaluation.scoring import compute_scores
 from app.evaluation.interview_evaluation.store import store_to_db
+from app.evaluation.interview_evaluation.models import EvaluationResult
 from app.models.interview_model import model
 from app.utils.discord_interview_client import DiscordClientInterview
+from app.evaluation.interview_evaluation.evaluate import InterviewEvaluator
 
 qa_flow = QAFlow(llm=model.llm, qdrant=model.qdrant, templates=PromptTemplates)
 graph = qa_flow.build_graph()
@@ -42,6 +48,8 @@ router = APIRouter()
 embedding_model = EmbeddingModel()
 discord_client = DiscordClient()
 discord_client_interview = DiscordClientInterview()
+
+safe_filter = SafeFilter()
 
 get_commit_data = CommitTools.get_commit_data
 
@@ -80,6 +88,13 @@ async def evaluate_and_save_mysql(content, metadata, conn_info):
             logger.warning("❌ 평가 결과를 파싱할 수 없어 DB 저장 생략")
     except Exception as e:
         logger.error(f"[TIL 평가 실패] {e}")
+
+@router.post("/filter")
+async def safety_filter(state: ContentSchema):
+    response = await safe_filter.content_filter(state)
+
+    result = {"result": response.filter_type}
+    return result
 
 @router.post("/til")
 async def commit_analysis(state: InputSchema):
@@ -184,23 +199,31 @@ async def generate(data: QAState):
         for idx, item in enumerate(result["content"]):
             question = item.question
             answer = item.answer
+            summary = result["summary"]
 
             #similarity_score = getattr(data, f"similarity_score{idx}", None)
-            similarity_score = result.get(f"similarity_score{idx}", None)
-            recall = result.get(f"recall_at_k{idx}", None)
+            # similarity_score = result.get(f"similarity_score{idx}", None)
+            # recall = result.get(f"recall_at_k{idx}", None)
+            context = result.get(f"context{idx}", "") 
 
-            scores = compute_scores(
-                reference=data.til, 
-                prediction=answer,
-                similarity_score=similarity_score,
-                recall_at_k=recall)
+            open_api_key = os.getenv("OPENAI_API_KEY")
 
+            evaluator = InterviewEvaluator(open_api_key=open_api_key)
+            parsed = evaluator.evaluate_interview(
+            til=data.til,
+            question=question,
+            context=context,  # 검색된 문서 요약
+            answer=answer
+)
+            valid_keys = EvaluationResult.__table__.columns.keys()
+            scores = {k: v for k, v in parsed.items() if k in valid_keys}
             # DB 저장
             store_to_db({
                 "til_content": data.til,
                 "email": data.email,
                 "question": question,
                 "answer": answer,
+                "summary": result["summary"],
                 **scores
             })
 
